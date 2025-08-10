@@ -1,0 +1,30 @@
+{
+  "name": "telebox",
+  "version": "0.0.1",
+  "description": "",
+  "scripts": {
+    "start": "ts-node -r tsconfig-paths/register ./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TeleBoxDev/TeleBox.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "LGPL-2.1-only",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/TeleBoxDev/TeleBox/issues"
+  },
+  "homepage": "https://github.com/TeleBoxDev/TeleBox#readme",
+  "dependencies": {
+    "@types/download": "^8.0.5",
+    "@types/node": "^24.2.1",
+    "download": "^8.0.0",
+    "sharp": "^0.34.3",
+    "telegram": "^2.26.22",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.2"
+  }
+}
