@@ -1,7 +1,12 @@
 .DS_Store
-assets/
-my_session/
-plugins/
-temp/
 config.json
+assets/
+!assets/.gitkeep
+my_session/
+!my_session/.gitkeep
+plugins/
+!plugins/.gitkeep
+temp/
+!temp/.gitkeep
 node_modules/
+!node_modules/.gitkeep
