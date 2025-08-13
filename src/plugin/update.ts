@@ -1,6 +1,7 @@
 import { Plugin } from '@utils/pluginBase';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { loadPlugins } from '@utils/pluginManager';
 
 const execAsync = promisify(exec);
 
@@ -49,6 +50,8 @@ const updatePlugin: Plugin = {
         const force = args.includes('--force') || args.includes('-f');
         await update(force);
         await event.message.edit({ text: '项目更新完成！' });
+        await loadPlugins(); // 重新加载插件
+        console.log('🔄 插件已重新加载。');
     },
 };
 

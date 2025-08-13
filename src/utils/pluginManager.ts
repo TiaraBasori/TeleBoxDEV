@@ -1,43 +1,39 @@
-import { Plugin } from "../utils/pluginBase";
 import path from "path";
 import fs from "fs";
-import { NewMessageEvent, NewMessage } from "telegram/events";
-import { execSync } from "child_process";
+import { Plugin } from "@utils/pluginBase";
 import { getGlobalClient } from "@utils/globalClient";
+import { NewMessageEvent, NewMessage } from "telegram/events";
 
-const prefixs: string[] = ["$", "."];
+let prefixs: string[] = ["$", "."];
+
+if (process.env.NODE_ENV === "development") {
+  prefixs = ["!", "！"];
+}
 
 const plugins: Map<string, Plugin> = new Map();
 
 const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
 const DEFAUTL_PLUGIN_PATH = path.join(process.cwd(), "src", "plugin");
 
-async function dynamicImportWithDeps(filePath: string) {
+function dynamicRequireWithDeps(filePath: string) {
   try {
-    return await import(filePath);
-  } catch (e) {
-    const err = e as Error;
-    const match = err.message.match(/Cannot find module '(.*?)'/);
-    if (match) {
-      const missingModule = match[1];
-      console.log(`📦 正在安装缺失模块: ${missingModule}...`);
-      execSync(`npm install ${missingModule}`, { stdio: "inherit" });
-
-      console.log(`✅ 模块 ${missingModule} 安装完成，重新导入插件...`);
-      return await import(filePath);
-    } else {
-      throw e;
-    }
+    delete require.cache[require.resolve(filePath)];
+    return require(filePath);
+  } catch (err) {
+    console.error(`Failed to require ${filePath}:`, err);
+    return null; // 或者 throw err，看你想如何处理
   }
 }
 
 async function setPlugins(basePath: string) {
   const files = fs.readdirSync(basePath).filter((file) => file.endsWith(".ts"));
   for (const file of files) {
-    const pluginPath = path.join(basePath, file);
-    const mod = await dynamicImportWithDeps(pluginPath);
-    const plugin: Plugin = mod.default;
-    plugins.set(plugin.command, plugin);
+    const pluginPath = path.resolve(basePath, file);
+    const mod = await dynamicRequireWithDeps(pluginPath);
+    if (mod) {
+      const plugin = mod.default;
+      plugins.set(plugin.command, plugin);
+    }
   }
 }
 
@@ -52,19 +48,13 @@ function listCommands(): string[] {
 async function dealCommandPlugin(event: NewMessageEvent) {
   const message = event.message;
   const text = message.message;
-  if (message.out) {
+  // 检查是否发送到 收藏信息
+  const savedMessage = (message as any).savedPeerId;
+  if (message.out || savedMessage) {
     if (!prefixs.some((p) => text.startsWith(p))) return;
-    const [cmd, ...args] = text.slice(1).split(" ");
+    const [cmd] = text.slice(1).split(" ");
     const plugin = getPlugin(cmd);
     if (plugin) {
-      if (args[0] == "help") {
-        await message.edit({
-          text: `插件 ${plugin.command} 的帮助信息:\n${
-            plugin.description || "无描述"
-          }`,
-        });
-        return;
-      }
       plugin.commandHandler(event);
     }
   }
@@ -94,4 +84,4 @@ async function loadPlugins() {
   // TODO: - 让用户可以监听新消息事件，从而可以使用 keyword 等监听事件类型的插件
 }
 
-export { loadPlugins };
+export { loadPlugins, listCommands, getPlugin };
