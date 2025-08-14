@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 
 /**
- * 异步安装并加载依赖，自动推断类型
+ * npm_install - 安装指定的 npm 包
  * @param pkg 包名
  * @param version 版本号（可选）
  */

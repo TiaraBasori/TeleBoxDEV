@@ -80,7 +80,9 @@ const npmPlugin: Plugin = {
   command: "npm",
   description: `
     本地资源: 对某个文件回复 npm install
-    远程资源: npm install eat`,
+    远程资源: npm install <plugin_name> || npm i <plugin_name>
+    卸载插件: npm uninstall <plugin_name> || npm rm <plugin_name> || npm un <plugin_name> || npm remove <plugin_name>
+    `,
   commandHandler: async (event: NewMessageEvent) => {
     const msg = event.message;
     const text = msg.message;
@@ -93,7 +95,12 @@ const npmPlugin: Plugin = {
     const cmd = args[0];
     if (cmd === "install" || cmd === "i") {
       await installPlugin(args, event);
-    } else if (cmd === "uninstall" || cmd === "remove") {
+    } else if (
+      cmd === "uninstall" ||
+      cmd == "un" ||
+      cmd === "remove" ||
+      cmd === "rm"
+    ) {
       await uninstallPlugin(args[1], event);
     }
   },

@@ -42,7 +42,7 @@ function getPlugin(command: string): Plugin | undefined {
 }
 
 function listCommands(): string[] {
-  return Array.from(plugins.keys());
+  return Array.from(plugins.keys()).sort((a, b) => a.localeCompare(b));
 }
 
 async function dealCommandPlugin(event: NewMessageEvent) {
@@ -56,6 +56,10 @@ async function dealCommandPlugin(event: NewMessageEvent) {
     const plugin = getPlugin(cmd);
     if (plugin) {
       plugin.commandHandler(event);
+    } else {
+      const availableCommands = listCommands();
+      const helpText = `未知命令：${cmd}\n可用命令：${availableCommands.join(", ")}`;
+      await message.edit({ text: helpText });
     }
   }
 }
