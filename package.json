@@ -1,6 +1,6 @@
 {
   "name": "telebox",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "",
   "scripts": {
     "start": "tsx -r tsconfig-paths/register ./src/index.ts",
@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/TeleBoxDev/TeleBox#readme",
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "@types/download": "^8.0.5",
     "@types/lodash": "^4.17.20",
     "axios": "^1.11.0",
@@ -28,6 +29,7 @@
     "telegram": "^2.26.22",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.20.4",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "youtubei.js": "^15.0.1"
   }
 }

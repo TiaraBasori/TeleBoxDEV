@@ -76,6 +76,27 @@ async function uninstallPlugin(plugin: string, event: NewMessageEvent) {
   await loadPlugins(); // 重新加载插件
 }
 
+async function uploadPlugin(args: string[], event: NewMessageEvent) {
+  const msg = event.message;
+  const pluginName = args[1];
+  if (!pluginName) {
+    await msg.edit({ text: "请提供插件名称" });
+    return;
+  }
+  const pluginPath = path.join(PLUGIN_PATH, `${pluginName}.ts`);
+  if (!fs.existsSync(pluginPath)) {
+    await msg.edit({ text: `未找到插件 ${pluginName}` });
+    return;
+  }
+  await msg.client?.sendFile(
+    msg.peerId,{
+    file: pluginPath,
+    // thumb: path.join(process.cwd(), "assets/eat/eatada.png"),
+    caption: `**TeleBox_Plugin ${pluginName} plugin.**`
+  })
+}
+
+
 const npmPlugin: Plugin = {
   command: "npm",
   description: `
@@ -102,6 +123,9 @@ const npmPlugin: Plugin = {
       cmd === "rm"
     ) {
       await uninstallPlugin(args[1], event);
+    }
+    else if (cmd == "upload") {
+      await uploadPlugin(args, event);
     }
   },
 };

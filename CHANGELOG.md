@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.5] -- 2025-08-15
+## Added
+- 新增 上传插件 .npm upload <Plugin>
+- 新增 封装 converstation 用来与 bot 持续对话
+- 添加 ytdl 依赖
+
 ## [0.0.4] -- 2025-08-14
 ### Fixed
 - 修复无法强制更新问题
