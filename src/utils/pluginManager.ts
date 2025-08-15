@@ -3,13 +3,15 @@ import fs from "fs";
 import { Plugin } from "@utils/pluginBase";
 import { getGlobalClient } from "@utils/globalClient";
 import { NewMessageEvent, NewMessage } from "telegram/events";
+import { AliasDB } from "./AliasDB";
 
-let prefixs: string[] = ["$", "."];
+let prefixs: string[] = ["$", ".", "。"];
 
 if (process.env.NODE_ENV === "development") {
   prefixs = ["!", "！"];
 }
 
+const basePlugins: Map<string, Plugin> = new Map(); // 用来储存没重命名的版本
 const plugins: Map<string, Plugin> = new Map();
 
 const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
@@ -31,8 +33,16 @@ async function setPlugins(basePath: string) {
     const pluginPath = path.resolve(basePath, file);
     const mod = await dynamicRequireWithDeps(pluginPath);
     if (mod) {
-      const plugin = mod.default;
-      plugins.set(plugin.command, plugin);
+      const plugin: Plugin = mod.default;
+      const command = plugin.command;
+      plugins.set(command, plugin);
+      basePlugins.set(command, plugin);
+      // 设置 alias 命令回复
+      const db = new AliasDB();
+      const alias = db.get(command);
+      if (alias) {
+        plugins.set(alias, plugin);
+      }
     }
   }
 }
@@ -42,7 +52,14 @@ function getPlugin(command: string): Plugin | undefined {
 }
 
 function listCommands(): string[] {
-  return Array.from(plugins.keys()).sort((a, b) => a.localeCompare(b));
+  const db = new AliasDB();
+  let cmds: string[] = Array.from(basePlugins.keys())
+    .sort((a, b) => a.localeCompare(b))
+    .map((item) => {
+      const anotherCMD = db.get(item);
+      return anotherCMD ? `${item}(${anotherCMD})` : item;
+    });
+  return cmds;
 }
 
 async function dealCommandPlugin(event: NewMessageEvent) {
@@ -58,13 +75,16 @@ async function dealCommandPlugin(event: NewMessageEvent) {
       plugin.commandHandler(event);
     } else {
       const availableCommands = listCommands();
-      const helpText = `未知命令：${cmd}\n可用命令：${availableCommands.join(", ")}`;
+      const helpText = `未知命令：${cmd}\n可用命令：${availableCommands.join(
+        ", "
+      )}`;
       await message.edit({ text: helpText });
     }
   }
 }
 
 async function clearPlugins() {
+  basePlugins.clear();
   plugins.clear();
 
   let client = await getGlobalClient();
