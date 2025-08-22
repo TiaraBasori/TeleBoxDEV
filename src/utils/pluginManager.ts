@@ -3,19 +3,22 @@ import fs from "fs";
 import { Plugin } from "@utils/pluginBase";
 import { getGlobalClient } from "@utils/globalClient";
 import { NewMessageEvent, NewMessage } from "telegram/events";
-import { AliasDB } from "./AliasDB";
-
-let prefixs: string[] = ["$", ".", "。"];
-
-if (process.env.NODE_ENV === "development") {
-  prefixs = ["!", "！"];
-}
+import { AliasDB } from "./aliasDB";
+import { Api } from "telegram";
 
 const basePlugins: Map<string, Plugin> = new Map(); // 用来储存没重命名的版本
 const plugins: Map<string, Plugin> = new Map();
 
 const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
 const DEFAUTL_PLUGIN_PATH = path.join(process.cwd(), "src", "plugin");
+
+function getPrefixs(): string[] {
+  let prefixs: string[] = ["$", ".", "。"];
+  if (process.env.NODE_ENV === "development") {
+    prefixs = ["！", "!"];
+  }
+  return prefixs;
+}
 
 function dynamicRequireWithDeps(filePath: string) {
   try {
@@ -62,23 +65,45 @@ function listCommands(): string[] {
   return cmds;
 }
 
-async function dealCommandPlugin(event: NewMessageEvent) {
-  const message = event.message;
-  const text = message.message;
-  // 检查是否发送到 收藏信息
-  const savedMessage = (message as any).savedPeerId;
-  if (message.out || savedMessage) {
-    if (!prefixs.some((p) => text.startsWith(p))) return;
-    const [cmd] = text.slice(1).split(" ");
-    const plugin = getPlugin(cmd);
+async function getCommandFromMessage(msg: Api.Message): Promise<string | null> {
+  let prefixs = getPrefixs();
+  const text = msg.message;
+  if (!prefixs.some((p) => text.startsWith(p))) return null;
+  const [cmd] = text.slice(1).split(" ");
+  if (!cmd) return null;
+  return cmd;
+}
+
+async function dealCommandPluginWithMessage(param: {
+  cmd: string;
+  msg: Api.Message;
+}) {
+  const { cmd, msg } = param;
+  const plugin = getPlugin(cmd);
+  try {
     if (plugin) {
-      plugin.commandHandler(event);
+      await plugin.cmdHandler!(msg);
     } else {
       const availableCommands = listCommands();
       const helpText = `未知命令：${cmd}\n可用命令：${availableCommands.join(
         ", "
       )}`;
-      await message.edit({ text: helpText });
+      await msg.edit({ text: helpText });
+    }
+  } catch (error) {
+    console.log(error);
+    await msg.edit({ text: `处理命令时出错：${error}` });
+  }
+}
+
+async function dealCommandPlugin(event: NewMessageEvent) {
+  const msg = event.message;
+  // 检查是否发送到 收藏信息
+  const savedMessage = (msg as any).savedPeerId;
+  if (msg.out || savedMessage) {
+    const cmd = await getCommandFromMessage(msg);
+    if (cmd) {
+      await dealCommandPluginWithMessage({ cmd, msg });
     }
   }
 }
@@ -104,8 +129,22 @@ async function loadPlugins() {
 
   let client = await getGlobalClient();
   // 注册插件命令处理器
-  client.addEventHandler(dealCommandPlugin, new NewMessage({}));
-  // TODO: - 让用户可以监听新消息事件，从而可以使用 keyword 等监听事件类型的插件
+  client.addEventHandler(dealCommandPlugin, new NewMessage());
+  // 添加监听新消息事件的处理器
+  for (const plugin of basePlugins.values()) {
+    const messageHandler = plugin.listenMessageHandler;
+    if (messageHandler) {
+      client.addEventHandler(async (event: NewMessageEvent) => {
+        messageHandler(event.message);
+      }, new NewMessage());
+    }
+  }
 }
 
-export { loadPlugins, listCommands, getPlugin };
+export {
+  loadPlugins,
+  listCommands,
+  getPlugin,
+  dealCommandPluginWithMessage,
+  getCommandFromMessage,
+};

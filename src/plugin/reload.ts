@@ -1,12 +1,10 @@
 import { Plugin } from "@utils/pluginBase";
-import { NewMessageEvent } from "telegram/events";
 import { loadPlugins } from "@utils/pluginManager";
 
 const reloadPlugin: Plugin = {
   command: "reload",
   description: "重新加载插件",
-  commandHandler: async (event: NewMessageEvent) => {
-    const msg = event.message;    
+  cmdHandler: async (msg) => {
     try {
       await loadPlugins();
       await msg.edit({ text: "插件已重新加载" });

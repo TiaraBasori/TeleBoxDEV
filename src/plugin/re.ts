@@ -1,12 +1,10 @@
-import { NewMessageEvent } from "telegram/events";
 import { Plugin } from "@utils/pluginBase";
 import { RPCError } from "telegram/errors";
 
 const rePlugin: Plugin = {
   command: "re",
   description: "转发消息",
-  commandHandler: async (event: NewMessageEvent) => {
-    const msg = event.message;
+  cmdHandler: async (msg) => {
     const [, ...args] = msg.text.slice(1).split(" ");
     const count = parseInt(args[0]) || 1;
     const repeat = parseInt(args[1]) || 1;

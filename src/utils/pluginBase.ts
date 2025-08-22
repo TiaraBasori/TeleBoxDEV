@@ -1,7 +1,10 @@
-import { NewMessageEvent } from "telegram/events";
+import { Api } from "telegram";
 
-export abstract class Plugin {
+abstract class Plugin {
   abstract command: string;
   abstract description?: string;
-  abstract commandHandler: (event: NewMessageEvent) => Promise<void>;
+  abstract cmdHandler: (msg: Api.Message) => Promise<void>;
+  abstract listenMessageHandler?: (msg: Api.Message) => Promise<void>;
 }
+
+export { Plugin };

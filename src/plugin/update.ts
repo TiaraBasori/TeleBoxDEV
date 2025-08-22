@@ -2,7 +2,7 @@ import { Plugin } from "@utils/pluginBase";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { loadPlugins } from "@utils/pluginManager";
-import { NewMessageEvent } from "telegram/events";
+import { Api } from "telegram";
 
 const execAsync = promisify(exec);
 
@@ -10,8 +10,7 @@ const execAsync = promisify(exec);
  * 自动更新项目：拉取 Git 更新 + 安装依赖
  * @param force 是否强制重置为远程 master（丢弃本地改动）
  */
-async function update(force = false, event: NewMessageEvent) {
-  const msg = event.message;
+async function update(force = false, msg: Api.Message) {
   await msg.edit({ text: "🚀 正在更新项目..." });
   console.clear();
   console.log("🚀 开始更新项目...\n");
@@ -49,10 +48,10 @@ async function update(force = false, event: NewMessageEvent) {
 const updatePlugin: Plugin = {
   command: "update",
   description: "更新项目：拉取最新代码并安装依赖",
-  commandHandler: async (event) => {
-    const args = event.message.message.slice(1).split(" ").slice(1);
+  cmdHandler: async (msg) => {
+    const args = msg.message.slice(1).split(" ").slice(1);
     const force = args.includes("--force") || args.includes("-f");
-    await update(force, event);
+    await update(force, msg);
   },
 };
 

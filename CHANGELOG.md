@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7] --2025-08-23
+## Added
+- 新增 sudo 用来分配权限给其他用户
+- 新增 exec 用来运行 shell
+- 新增 Plugin 监听函数，用来实现如 keyword 以及 sudo 等插件的主要监听部分
+- Plugin 调整结构，处理命令行函数不再传入 NewMessageEvent，而是传入 Api.Message，需要调整下插件
+
 ## [0.0.6] -- 2025-08-15
 ## Added
 - 新增 alias 重定向插件命令
