@@ -100,8 +100,11 @@ const sudoPlugin: Plugin = {
     const sudoDB = new SudoDB();
     const users = sudoDB.ls().map((user) => user.uid);
     sudoDB.close();
-    const fromId = msg.fromId as any;
-    const userId = fromId.userId;
+    const fromId = msg.fromId;
+    if (!fromId) return;
+    const user = await msg.client?.getEntity(fromId as any);
+    if (!(user instanceof Api.User)) return;
+    const userId = user.id;
     if (userId && users.includes(Number(userId))) {
       const cmd = await getCommandFromMessage(msg);
       if (!cmd) return;
