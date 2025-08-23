@@ -1,6 +1,7 @@
 import { Plugin } from "@utils/pluginBase";
 import { AliasDB } from "@utils/aliasDB";
 import { Api } from "telegram";
+import { loadPlugins } from "@utils/pluginManager";
 
 async function setAlias(args: string[], msg: Api.Message) {
   const db = new AliasDB();
@@ -8,6 +9,7 @@ async function setAlias(args: string[], msg: Api.Message) {
   const final = args[2];
   db.set(original, final);
   db.close();
+  loadPlugins();
   await msg.edit({
     text: `插件命令重命名成功，${original} -> ${final}`,
   });
@@ -15,11 +17,18 @@ async function setAlias(args: string[], msg: Api.Message) {
 
 async function delAlias(args: string[], msg: Api.Message) {
   const db = new AliasDB();
-  db.del(args[1]);
+  const success = db.del(args[1]);
   db.close();
-  await msg.edit({
-    text: `删除 ${args[1]} 重命名成功`,
-  });
+  if (success) {
+    await msg.edit({
+      text: `删除 ${args[1]} 重命名成功`,
+    });
+    loadPlugins();
+  } else {
+    await msg.edit({
+      text: `删除 ${args[1]} 重命名失败, 请检查命令是否存在`,
+    });
+  }
 }
 
 async function listAlias(args: string[], msg: Api.Message) {
@@ -34,12 +43,11 @@ async function listAlias(args: string[], msg: Api.Message) {
 
 const aliasPlugin: Plugin = {
   command: "alias",
-  description: `
-插件命名重命名
-.alias set a b, a -> b
-.alias del a
-.alias ls
-    `,
+  description:
+    `插件命名重命名\n` +
+    `.alias set a b, a -> b\n` +
+    `.alias del b\n` +
+    `.alias ls`,
   cmdHandler: async (msg) => {
     const [, ...args] = msg.message.slice(1).split(" ");
     if (args.length == 0) {

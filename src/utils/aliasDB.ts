@@ -61,11 +61,7 @@ class AliasDB {
    */
   public del(original: string): boolean {
     const info = this.db
-      .prepare(
-        `
-      DELETE FROM aliases WHERE original = ?
-    `
-      )
+      .prepare(`DELETE FROM aliases WHERE final = ?`)
       .run(original);
     return info.changes > 0;
   }

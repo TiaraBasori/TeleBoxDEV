@@ -4,7 +4,7 @@ import { Plugin } from "@utils/pluginBase";
 import { getGlobalClient } from "@utils/globalClient";
 import { NewMessageEvent, NewMessage } from "telegram/events";
 import { AliasDB } from "./aliasDB";
-import { Api } from "telegram";
+import { Api, TelegramClient } from "telegram";
 
 const basePlugins: Map<string, Plugin> = new Map(); // 用来储存没重命名的版本
 const plugins: Map<string, Plugin> = new Map();
@@ -108,6 +108,21 @@ async function dealCommandPlugin(event: NewMessageEvent) {
   }
 }
 
+function dealListenMessagePlugin(client: TelegramClient): void {
+  for (const plugin of basePlugins.values()) {
+    const messageHandler = plugin.listenMessageHandler;
+    if (messageHandler) {
+      client.addEventHandler(async (event: NewMessageEvent) => {
+        try {
+          await messageHandler(event.message);
+        } catch (error) {
+          console.log("listenMessageHandler error:", error);
+        }
+      }, new NewMessage());
+    }
+  }
+}
+
 async function clearPlugins() {
   basePlugins.clear();
   plugins.clear();
@@ -131,14 +146,7 @@ async function loadPlugins() {
   // 注册插件命令处理器
   client.addEventHandler(dealCommandPlugin, new NewMessage());
   // 添加监听新消息事件的处理器
-  for (const plugin of basePlugins.values()) {
-    const messageHandler = plugin.listenMessageHandler;
-    if (messageHandler) {
-      client.addEventHandler(async (event: NewMessageEvent) => {
-        messageHandler(event.message);
-      }, new NewMessage());
-    }
-  }
+  dealListenMessagePlugin(client);
 }
 
 export {

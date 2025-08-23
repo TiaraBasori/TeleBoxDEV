@@ -77,12 +77,11 @@ async function handleList(msg: Api.Message) {
  */
 const sudoPlugin: Plugin = {
   command: "sudo",
-  description: `
-赋予其他用户使用 bot 权限，
-.sudo add (回复用户消息) - 添加用户
-.sudo del (回复用户消息) - 删除用户
-.sudo ls - 列出所有用户
-  `,
+  description:
+    `赋予其他用户使用 bot 权限\n` +
+    `.sudo add (回复用户消息) - 添加用户\n` +
+    `.sudo del (回复用户消息) - 删除用户\n` +
+    `.sudo ls - 列出所有用户`,
   cmdHandler: async (msg) => {
     const [, ...args] = msg.message.slice(1).split(" ");
     const command = args[0];
@@ -101,10 +100,8 @@ const sudoPlugin: Plugin = {
     const users = sudoDB.ls().map((user) => user.uid);
     sudoDB.close();
     const fromId = msg.fromId;
-    if (!fromId) return;
-    const user = await msg.client?.getEntity(fromId as any);
-    if (!(user instanceof Api.User)) return;
-    const userId = user.id;
+    if (!(fromId instanceof Api.PeerUser)) return;
+    const userId = fromId.userId;
     if (userId && users.includes(Number(userId))) {
       const cmd = await getCommandFromMessage(msg);
       if (!cmd) return;
