@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.0] --2025-08-25
+## Added
+- Plugin @property command 改成 string[]，满足一些多命令的插件，需要调整以前的插件结构
+
 ## [0.0.9] --2025-08-23
 ## Added
 - alias set|del 相关命令后重启插件从而能无缝使用新命令来唤出插件

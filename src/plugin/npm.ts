@@ -88,17 +88,18 @@ async function uploadPlugin(args: string[], msg: Api.Message) {
   }
   await msg.client?.sendFile(msg.peerId, {
     file: pluginPath,
-    // thumb: path.join(process.cwd(), "assets/eat/eatada.png"),
+    thumb: path.join(process.cwd(), "telebox.png"),
     caption: `**TeleBox_Plugin ${pluginName} plugin.**`,
   });
+  await msg.delete();
 }
 
 const npmPlugin: Plugin = {
-  command: "npm",
-  description: `
-本地资源: 对某个文件回复 npm install
-远程资源: npm install <plugin_name> || npm i <plugin_name>
-卸载插件: npm uninstall <plugin_name> || npm rm <plugin_name> || npm un <plugin_name> || npm remove <plugin_name>
+  command: ["npm"],
+  description:
+    `本地资源: 对某个文件回复 npm install\n` +
+    `远程资源: npm install <plugin_name> || npm i <plugin_name>\n` +
+    `卸载插件: npm uninstall <plugin_name> || npm rm <plugin_name> || npm un <plugin_name> || npm remove <plugin_name>
     `,
   cmdHandler: async (msg) => {
     const text = msg.message;

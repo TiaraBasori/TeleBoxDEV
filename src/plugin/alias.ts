@@ -42,11 +42,11 @@ async function listAlias(args: string[], msg: Api.Message) {
 }
 
 const aliasPlugin: Plugin = {
-  command: "alias",
+  command: ["alias"],
   description:
     `插件命名重命名\n` +
     `.alias set a b, a -> b\n` +
-    `.alias del b\n` +
+    `.alias del a\n` +
     `.alias ls`,
   cmdHandler: async (msg) => {
     const [, ...args] = msg.message.slice(1).split(" ");

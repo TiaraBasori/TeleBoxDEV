@@ -46,7 +46,7 @@ async function update(force = false, msg: Api.Message) {
 }
 
 const updatePlugin: Plugin = {
-  command: "update",
+  command: ["update"],
   description: "更新项目：拉取最新代码并安装依赖",
   cmdHandler: async (msg) => {
     const args = msg.message.slice(1).split(" ").slice(1);

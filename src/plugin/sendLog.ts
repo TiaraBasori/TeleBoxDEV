@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 
 const sendLogPlugin: Plugin = {
-  command: "sendlog",
+  command: ["sendlog"],
   description: "发送日志",
   cmdHandler: async (msg) => {
     try {

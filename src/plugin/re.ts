@@ -2,7 +2,7 @@ import { Plugin } from "@utils/pluginBase";
 import { RPCError } from "telegram/errors";
 
 const rePlugin: Plugin = {
-  command: "re",
+  command: ["re"],
   description: "转发消息",
   cmdHandler: async (msg) => {
     const [, ...args] = msg.text.slice(1).split(" ");

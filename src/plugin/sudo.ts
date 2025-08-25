@@ -76,7 +76,7 @@ async function handleList(msg: Api.Message) {
  * sudo 插件
  */
 const sudoPlugin: Plugin = {
-  command: "sudo",
+  command: ["sudo"],
   description:
     `赋予其他用户使用 bot 权限\n` +
     `.sudo add (回复用户消息) - 添加用户\n` +

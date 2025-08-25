@@ -2,7 +2,7 @@ import { Plugin } from "@utils/pluginBase";
 import { loadPlugins } from "@utils/pluginManager";
 
 const reloadPlugin: Plugin = {
-  command: "reload",
+  command: ["reload"],
   description: "重新加载插件",
   cmdHandler: async (msg) => {
     try {

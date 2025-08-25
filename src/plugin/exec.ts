@@ -22,7 +22,7 @@ async function handleExec(params: { msg: Api.Message; shellCommand: string }) {
 }
 
 const execPlugin: Plugin = {
-  command: "exec",
+  command: ["exec"],
   description: "运行 shell 命令",
   cmdHandler: async (msg) => {
     const shellCommand = msg.message.slice(1).replace(/^\S+\s+/, ""); // 因为用户可能会更改重定向命令 用正则可能更稳妥

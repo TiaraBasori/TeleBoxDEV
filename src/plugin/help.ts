@@ -3,7 +3,7 @@ import { Plugin } from "@utils/pluginBase";
 import { Api } from "telegram";
 
 const helpPlugin: Plugin = {
-  command: "help",
+  command: ["h", "help"],
   description: "查看帮助信息",
   cmdHandler: async (msg: Api.Message) => {
     const [, ...args] = msg.message.slice(1).split(" ");

@@ -37,16 +37,19 @@ async function setPlugins(basePath: string) {
     const mod = await dynamicRequireWithDeps(pluginPath);
     if (mod) {
       const plugin: Plugin = mod.default;
-      const command = plugin.command;
+      const commands = plugin.command;
+      for (const command of commands) {
       plugins.set(command, plugin);
       basePlugins.set(command, plugin);
       // 设置 alias 命令回复
       const db = new AliasDB();
       const alias = db.get(command);
+      db.close();
       if (alias) {
         plugins.set(alias, plugin);
       }
     }
+  }
   }
 }
 
