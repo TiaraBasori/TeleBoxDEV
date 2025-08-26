@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { env } from 'process';
 
 /**
  * npm_install - 安装指定的 npm 包

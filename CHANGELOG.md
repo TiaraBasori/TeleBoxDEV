@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] --2025-08-26
+## Added
+- help 可查看当前版本
+- 添加 id 插件
+- .npm search 可查看远程插件列表
+
 ## [0.1.0] --2025-08-25
 ## Added
 - Plugin @property command 改成 string[]，满足一些多命令的插件，需要调整以前的插件结构

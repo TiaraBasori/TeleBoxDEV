@@ -94,6 +94,17 @@ async function uploadPlugin(args: string[], msg: Api.Message) {
   await msg.delete();
 }
 
+async function search(msg: Api.Message) {
+  const url = `https://github.com/TeleBoxDev/TeleBox_Plugins/blob/main/plugins.json?raw=true`;
+  const res = await axios.get(url);
+  if (res.status === 200) {
+    const plugins = Object.keys(res.data);
+    await msg.edit({ text: `远程插件列表:\n${plugins.join("\n")}` });
+  } else {
+    await msg.edit({ text: `无法获取远程插件库` });
+  }
+}
+
 const npmPlugin: Plugin = {
   command: ["npm"],
   description:
@@ -103,7 +114,7 @@ const npmPlugin: Plugin = {
     `,
   cmdHandler: async (msg) => {
     const text = msg.message;
-    const [, ...args] = text.slice(1).split(" ");
+    const [, ...args] = text.split(" ");
     if (args.length === 0) {
       await msg.edit({ text: "请输入完整指令" });
       return;
@@ -121,6 +132,8 @@ const npmPlugin: Plugin = {
       await uninstallPlugin(args[1], msg);
     } else if (cmd == "upload") {
       await uploadPlugin(args, msg);
+    } else if (cmd === "search") {
+      await search(msg);
     }
   },
 };

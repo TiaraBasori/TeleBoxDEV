@@ -49,7 +49,7 @@ const aliasPlugin: Plugin = {
     `.alias del a\n` +
     `.alias ls`,
   cmdHandler: async (msg) => {
-    const [, ...args] = msg.message.slice(1).split(" ");
+    const [, ...args] = msg.message.split(" ");
     if (args.length == 0) {
       await msg.edit({
         text: "不知道你要干什么！",
