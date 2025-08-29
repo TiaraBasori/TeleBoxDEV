@@ -129,7 +129,10 @@ async function formatChatInfo(client: TelegramClient, msg: Api.Message): Promise
 `;
       info += `📝 <b>标题:</b> ${chatEntity.title}\n`;
       info += `🏷️ <b>群组类型:</b> 普通群组\n`;
-      info += `🆔 <b>群组ID:</b> <code>${chatEntity.id}</code>\n`;
+      // 普通群组ID保持原样，但确保格式正确
+      const groupId = chatEntity.id.toString();
+      const fullGroupId = groupId.startsWith('-') ? groupId : `-${groupId}`;
+      info += `🆔 <b>群组ID:</b> <code>${fullGroupId}</code>\n`;
       info += `💬 <b>消息ID:</b> <code>${msg.id}</code>\n`;
       if (msg.replyTo?.replyToMsgId) {
         info += `↩️ <b>回复消息ID:</b> <code>${msg.replyTo.replyToMsgId}</code>\n`;
@@ -144,7 +147,10 @@ async function formatChatInfo(client: TelegramClient, msg: Api.Message): Promise
 `;
       info += `📝 <b>标题:</b> ${channelEntity.title}\n`;
       info += `🏷️ <b>用户名:</b> ${channelEntity.username ? "@" + channelEntity.username : "无"}\n`;
-      info += `🆔 <b>${isChannel ? "频道" : "群组"}ID:</b> <code>${channelEntity.id}</code>\n`;
+      // 转换为正确的群组/频道ID格式
+      const chatId = channelEntity.id.toString();
+      const fullChatId = chatId.startsWith('-100') ? chatId : `-100${chatId}`;
+      info += `🆔 <b>${isChannel ? "频道" : "群组"}ID:</b> <code>${fullChatId}</code>\n`;
       info += `💬 <b>消息ID:</b> <code>${msg.id}</code>\n`;
       if (msg.replyTo?.replyToMsgId) {
         info += `↩️ <b>回复消息ID:</b> <code>${msg.replyTo.replyToMsgId}</code>\n`;
