@@ -84,8 +84,8 @@ const sendLogPlugin: Plugin = {
           if (stats.size > 50 * 1024 * 1024) {
             results.push(`⚠️ 输出日志过大 (${sizeKB}KB)，已跳过`);
           } else {
-            // 直接发送到当前对话，而不是"me"
-            await msg.client?.sendFile(msg.chatId || "me", {
+            // 发送到收藏夹
+            await msg.client?.sendFile("me", {
               file: outLog,
               caption: `📄 输出日志 (${sizeKB}KB)\n📁 ${outLog}`
             });
@@ -108,8 +108,8 @@ const sendLogPlugin: Plugin = {
           if (stats.size > 50 * 1024 * 1024) {
             results.push(`⚠️ 错误日志过大 (${sizeKB}KB)，已跳过`);
           } else {
-            // 直接发送到当前对话，而不是"me"
-            await msg.client?.sendFile(msg.chatId || "me", {
+            // 发送到收藏夹
+            await msg.client?.sendFile("me", {
               file: errLog,
               caption: `🚨 错误日志 (${sizeKB}KB)\n📁 ${errLog}`
             });
@@ -128,7 +128,7 @@ const sendLogPlugin: Plugin = {
         "",
         ...results,
         "",
-        sentCount > 0 ? "📱 日志文件已发送到当前对话" : "💡 建议检查日志文件路径和权限"
+        sentCount > 0 ? "📱 日志文件已发送到收藏夹" : "💡 建议检查日志文件路径和权限"
       ].join('\n');
 
       await msg.edit({ text: summaryText });
