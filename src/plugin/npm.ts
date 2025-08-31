@@ -99,9 +99,15 @@ async function search(msg: Api.Message) {
   const res = await axios.get(url);
   if (res.status === 200) {
     const plugins = Object.keys(res.data);
-    await msg.edit({ text: `远程插件列表:\n${plugins.join("\n")}` });
+    const pluginList = plugins.map(plugin => `• <code>${plugin}</code>`).join("\n");
+    const installTip = `\n\n💡 <b>安装方法:</b> <code>npm i &lt;插件名&gt;</code>`;
+    const repoLink = `\n\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
+    await msg.edit({ 
+      text: `🔍 <b>远程插件列表:</b>\n\n${pluginList}${installTip}${repoLink}`,
+      parseMode: "html"
+    });
   } else {
-    await msg.edit({ text: `无法获取远程插件库` });
+    await msg.edit({ text: `❌ 无法获取远程插件库` });
   }
 }
 
@@ -110,7 +116,7 @@ const npmPlugin: Plugin = {
   description:
     `本地资源: 对某个文件回复 npm install\n` +
     `远程资源: npm install <plugin_name> || npm i <plugin_name>\n` +
-    `卸载插件: npm uninstall <plugin_name> || npm rm <plugin_name> || npm un <plugin_name> || npm remove <plugin_name>
+    `卸载插件: npm remove <plugin_name> || npm rm <plugin_name> || npm un <plugin_name> || npm uninstall <plugin_name>
     `,
   cmdHandler: async (msg) => {
     const text = msg.message;
