@@ -6,7 +6,7 @@ import { NewMessageEvent, NewMessage } from "telegram/events";
 import { AliasDB } from "./aliasDB";
 import { Api, TelegramClient } from "telegram";
 
-const basePlugins: Map<string, Plugin> = new Map(); // 用来储存没重命名的版本
+const basePlugins: Map<string, Plugin> = new Map(); // 用来储存唯一插件，不管他的重命名以及子命令
 const plugins: Map<string, Plugin> = new Map();
 
 const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
@@ -38,9 +38,10 @@ async function setPlugins(basePath: string) {
     if (mod) {
       const plugin: Plugin = mod.default;
       const commands = plugin.command;
+      // 只存第一个，这样才不会影响到监听函数的实行，不会多添加同一插件的多个监听函数
+      basePlugins.set(commands[0], plugin);
       for (const command of commands) {
       plugins.set(command, plugin);
-      basePlugins.set(command, plugin);
       // 设置 alias 命令回复
       const db = new AliasDB();
       const alias = db.get(command);
@@ -112,6 +113,7 @@ async function dealCommandPlugin(event: NewMessageEvent) {
 }
 
 function dealListenMessagePlugin(client: TelegramClient): void {
+  // 多命令的插件，会额外添加监听事件
   for (const plugin of basePlugins.values()) {
     const messageHandler = plugin.listenMessageHandler;
     if (messageHandler) {
