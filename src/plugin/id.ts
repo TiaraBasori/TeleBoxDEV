@@ -10,18 +10,27 @@ const idPlugin: Plugin = {
     let targetInfo = "";
     
     try {
-      // 如果有回复消息，显示被回复用户的信息
+      // 如果有回复消息，优先显示回复信息
       if (msg.replyTo) {
         const repliedMsg = await msg.getReplyMessage();
         if (repliedMsg?.senderId) {
-          targetInfo += await formatUserInfo(client, repliedMsg.senderId, "被回复用户信息", true);
+          targetInfo += await formatUserInfo(client, repliedMsg.senderId, "REPLIED USER", true);
+          targetInfo += "\n";
         }
-      } else {
-        // 没有回复消息时，显示当前聊天和自己的信息
-        targetInfo += await formatSelfInfo(client);
-        targetInfo += "\n" + "═".repeat(30) + "\n\n";
-        targetInfo += await formatChatInfo(client, msg);
       }
+      
+      // 显示消息详细信息
+      targetInfo += await formatMessageInfo(msg);
+      targetInfo += "\n";
+      
+      if (!msg.replyTo) {
+        // 没有回复消息时，显示自己的信息
+        targetInfo += await formatSelfInfo(client);
+        targetInfo += "\n";
+      }
+      
+      // 显示聊天信息
+      targetInfo += await formatChatInfo(client, msg);
       
       await msg.edit({
         text: targetInfo,
@@ -35,67 +44,58 @@ const idPlugin: Plugin = {
   },
 };
 
-// 格式化用户信息
-async function formatUserInfo(client: TelegramClient, userId: any, title: string = "用户信息", showCommonGroups: boolean = true): Promise<string> {
+// 格式化消息信息
+async function formatMessageInfo(msg: Api.Message): Promise<string> {
   try {
-    const user = await client.getEntity(userId);
-    let info = `🔍 <b>${title}</b>
-`;
+    let info = `<b>MESSAGE</b>\n`;
     
-    // 检查是否为用户类型
-    if (user.className === "User") {
-      const userEntity = user as Api.User;
-      
-      // 基本信息
-      const fullName = [userEntity.firstName, userEntity.lastName].filter(Boolean).join(" ") || "无";
-      info += `👤 <b>姓名:</b> ${fullName}\n`;
-      info += `🏷️ <b>用户名:</b> ${userEntity.username ? "@" + userEntity.username : "无"}\n`;
-      info += `🆔 <b>用户ID:</b> <code>${userEntity.id}</code>\n`;
-      
-      try {
-        // 简介
-        const fullUser = await client.invoke(new Api.users.GetFullUser({ id: userEntity }));
-        if (fullUser.fullUser.about) {
-          info += `📝 <b>简介:</b> ${fullUser.fullUser.about}\n`;
-        }
-        
-        // 共同群组数量（仅在回复时显示）
-        if (showCommonGroups) {
-          try {
-            const commonChats = await client.invoke(new Api.messages.GetCommonChats({
-              userId: userEntity.id,
-              maxId: userEntity.id.multiply(0),
-              limit: 100
-            }));
-            info += `👥 <b>共同群组:</b> ${commonChats.chats.length} 个\n`;
-          } catch (e) {
-            info += `👥 <b>共同群组:</b> 无法获取\n`;
-          }
-        }
-      } catch (e) {
-        // 忽略获取详细信息的错误
-      }
-      
-      // 状态信息
-      info += "\n📊 <b>状态信息</b>\n";
-      info += `${userEntity.verified ? "✅" : "❌"} <b>官方认证:</b> ${userEntity.verified ? "已认证" : "未认证"}\n`;
-      info += `${userEntity.restricted ? "🚫" : "✅"} <b>账户状态:</b> ${userEntity.restricted ? "受限" : "正常"}\n`;
-      
-      // 用户类型
-      let userType = "👤 普通用户";
-      if (userEntity.bot) userType = "🤖 机器人";
-      if (userEntity.premium) userType += " 💎";
-      if (userEntity.fake) userType += " ⚠️ 虚假";
-      if (userEntity.scam) userType += " 🚨 诈骗";
-      info += `🏷️ <b>用户类型:</b> ${userType}\n`;
-    } else {
-      info += `🆔 <b>用户ID:</b> <code>${user.id}</code>\n`;
-      info += `📋 <b>类型:</b> ${user.className}\n`;
+    if (msg.replyTo?.replyToMsgId) {
+      info += `· Reply to: <code>${msg.replyTo.replyToMsgId}</code>\n`;
+    }
+    
+    info += `· ID: <code>${msg.id}</code>\n`;
+    info += `· Sender: <code>${msg.senderId || "N/A"}</code>\n`;
+    info += `· Chat: <code>${msg.chatId || "N/A"}</code>\n`;
+    
+    if (msg.date) {
+      info += `· Time: ${new Date(msg.date * 1000).toLocaleString('zh-CN')}\n`;
+    }
+    
+    if (msg.fwdFrom?.fromId) {
+      info += `· Forwarded: <code>${msg.fwdFrom.fromId}</code>\n`;
     }
     
     return info;
   } catch (error: any) {
-    return `❌ <b>${title}</b>\n获取用户信息失败: ${error.message}\n`;
+    return `<b>MESSAGE</b>\nError: ${error.message}\n`;
+  }
+}
+
+// 格式化用户信息
+async function formatUserInfo(client: TelegramClient, userId: any, title: string = "USER", showCommonGroups: boolean = true): Promise<string> {
+  try {
+    const user = await client.getEntity(userId);
+    let info = `<b>${title}</b>\n`;
+    
+    if (user.className === "User") {
+      const userEntity = user as Api.User;
+      const fullName = [userEntity.firstName, userEntity.lastName].filter(Boolean).join(" ") || "N/A";
+      
+      info += `· Name: ${fullName}\n`;
+      info += `· Username: ${userEntity.username ? "@" + userEntity.username : "N/A"}\n`;
+      info += `· ID: <code>${userEntity.id}</code>\n`;
+      
+      if (userEntity.bot) info += `· Type: Bot\n`;
+      if (userEntity.verified) info += `· Verified\n`;
+      if (userEntity.premium) info += `· Premium\n`;
+    } else {
+      info += `· ID: <code>${user.id}</code>\n`;
+      info += `· Type: ${user.className}\n`;
+    }
+    
+    return info;
+  } catch (error: any) {
+    return `<b>${title}</b>\nError: ${error.message}\n`;
   }
 }
 
@@ -103,9 +103,9 @@ async function formatUserInfo(client: TelegramClient, userId: any, title: string
 async function formatSelfInfo(client: TelegramClient): Promise<string> {
   try {
     const me = await client.getMe();
-    return await formatUserInfo(client, me.id, "我的信息", false);
+    return await formatUserInfo(client, me.id, "SELF", false);
   } catch (error: any) {
-    return `❌ <b>我的信息</b>\n获取自己信息失败: ${error.message}\n`;
+    return `<b>SELF</b>\nError: ${error.message}\n`;
   }
 }
 
@@ -113,67 +113,39 @@ async function formatSelfInfo(client: TelegramClient): Promise<string> {
 async function formatChatInfo(client: TelegramClient, msg: Api.Message): Promise<string> {
   try {
     if (!msg.chatId) {
-      return `❌ <b>聊天信息</b>\n无法获取聊天ID\n`;
+      return `<b>CHAT</b>\nError: No chat ID\n`;
     }
     
     const chat = await client.getEntity(msg.chatId);
     let info = "";
     
     if (chat.className === "User") {
-      // 私聊
-      info += await formatUserInfo(client, chat.id, "私聊对象信息", false);
+      info += await formatUserInfo(client, chat.id, "PRIVATE", false);
     } else if (chat.className === "Chat" || chat.className === "ChatForbidden") {
-      // 群组
       const chatEntity = chat as Api.Chat;
-      info += `👥 <b>群组信息</b>
-`;
-      info += `📝 <b>标题:</b> ${chatEntity.title}\n`;
-      info += `🏷️ <b>群组类型:</b> 普通群组\n`;
-      // 普通群组ID保持原样，但确保格式正确
+      info += `<b>GROUP</b>\n`;
+      info += `· Title: ${chatEntity.title}\n`;
       const groupId = chatEntity.id.toString();
       const fullGroupId = groupId.startsWith('-') ? groupId : `-${groupId}`;
-      info += `🆔 <b>群组ID:</b> <code>${fullGroupId}</code>\n`;
-      info += `💬 <b>消息ID:</b> <code>${msg.id}</code>\n`;
-      if (msg.replyTo?.replyToMsgId) {
-        info += `↩️ <b>回复消息ID:</b> <code>${msg.replyTo.replyToMsgId}</code>\n`;
-      }
-      info += `🏷️ <b>用户名:</b> 无\n`;
+      info += `· ID: <code>${fullGroupId}</code>\n`;
     } else if (chat.className === "Channel") {
-      // 频道或超级群组
       const channelEntity = chat as Api.Channel;
       const isChannel = channelEntity.broadcast;
-      const icon = isChannel ? "📢" : "👥";
-      info += `${icon} <b>${isChannel ? "频道" : "超级群组"}信息</b>
-`;
-      info += `📝 <b>标题:</b> ${channelEntity.title}\n`;
-      info += `🏷️ <b>用户名:</b> ${channelEntity.username ? "@" + channelEntity.username : "无"}\n`;
-      // 转换为正确的群组/频道ID格式
+      info += `<b>${isChannel ? "CHANNEL" : "GROUP"}</b>\n`;
+      info += `· Title: ${channelEntity.title}\n`;
+      info += `· Username: ${channelEntity.username ? "@" + channelEntity.username : "N/A"}\n`;
       const chatId = channelEntity.id.toString();
       const fullChatId = chatId.startsWith('-100') ? chatId : `-100${chatId}`;
-      info += `🆔 <b>${isChannel ? "频道" : "群组"}ID:</b> <code>${fullChatId}</code>\n`;
-      info += `💬 <b>消息ID:</b> <code>${msg.id}</code>\n`;
-      if (msg.replyTo?.replyToMsgId) {
-        info += `↩️ <b>回复消息ID:</b> <code>${msg.replyTo.replyToMsgId}</code>\n`;
-      }
+      info += `· ID: <code>${fullChatId}</code>\n`;
       
-      // 获取详细信息
-      try {
-        const fullChat = await client.invoke(new Api.channels.GetFullChannel({ channel: channelEntity }));
-        if (fullChat.fullChat.about) {
-          info += `📝 <b>简介:</b> ${fullChat.fullChat.about}\n`;
-        }
-        if (fullChat.fullChat.className === "ChannelFull") {
-          const channelFull = fullChat.fullChat as Api.ChannelFull;
-          info += `👤 <b>成员数:</b> ${channelFull.participantsCount || "未知"}\n`;
-        }
-      } catch (e) {
-        // 忽略获取详细信息的错误
+      if (channelEntity.verified) {
+        info += `· Verified\n`;
       }
     }
     
     return info;
   } catch (error: any) {
-    return `❌ <b>聊天信息</b>\n获取聊天信息失败: ${error.message}\n`;
+    return `<b>CHAT</b>\nError: ${error.message}\n`;
   }
 }
 

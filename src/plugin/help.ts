@@ -36,25 +36,29 @@ function formatCommandList(commands: string[]): string {
   
   const result: string[] = [];
   
-  // 添加单个命令
+  // 基础命令显示
   if (singleCommands.length > 0) {
-    result.push(singleCommands.map(cmd => `<code>${cmd}</code>`).join(', '));
+    const formattedCommands = singleCommands.map(cmd => `<code>${cmd}</code>`).join(' • ');
+    result.push(`📋 <b>基础命令:</b> ${formattedCommands}`);
   }
   
   // 添加多子指令插件组
-  for (const [mainCommand, subCommands] of pluginGroups) {
-    // 特殊处理：speedtest插件以speedtest为主命令显示
-    if (mainCommand === 's' && subCommands.includes('speedtest')) {
-      const otherCommands = subCommands.filter(cmd => cmd !== 'speedtest');
-      const formattedSubs = otherCommands.map(cmd => `<code>${cmd}</code>`).join(', ');
-      result.push(`<b>speedtest:</b> ${formattedSubs}`);
-    } else {
-      const formattedSubs = subCommands.map(cmd => `<code>${cmd}</code>`).join(', ');
-      result.push(`<b>${mainCommand}:</b> ${formattedSubs}`);
+  if (pluginGroups.size > 0) {
+    result.push(`\n🔧 <b>功能模块:</b>`);
+    for (const [mainCommand, subCommands] of pluginGroups) {
+      // 特殊处理：speedtest插件以speedtest为主命令显示
+      if (mainCommand === 's' && subCommands.includes('speedtest')) {
+        const otherCommands = subCommands.filter(cmd => cmd !== 'speedtest');
+        const formattedSubs = otherCommands.map(cmd => `<code>${cmd}</code>`).join(' • ');
+        result.push(`<b>speedtest:</b> ${formattedSubs}`);
+      } else {
+        const formattedSubs = subCommands.map(cmd => `<code>${cmd}</code>`).join(' • ');
+        result.push(`<b>${mainCommand}:</b> ${formattedSubs}`);
+      }
     }
   }
   
-  return result.join('\n\n');
+  return result.join('\n');
 }
 
 function htmlEscape(text: string): string {
@@ -80,17 +84,11 @@ const helpPlugin: Plugin = {
         const totalCommands = commands.length;
         
         const helpText = [
-          `🤖 <b>Telebox v${htmlEscape(version)}</b> | ${totalCommands}个命令`,
+          `🚀 <b>TeleBox v${htmlEscape(version)}</b> | ${totalCommands}个命令`,
           "",
           formatCommandList(commands),
           "",
-          "💡 <b>使用说明:</b>",
-          "• 使用 <code>.help &lt;命令&gt;</code> 查看具体帮助",
-          "• 命令前缀使用 <code>.</code>",
-          "• 部分命令支持多个别名",
-          "",
-          "🔍 <b>示例:</b>",
-          "• <code>.help sendlog</code> - 查看日志发送帮助"
+          "💡 <code>.help [命令]</code> 查看详情 | <a href='https://github.com/TeleBoxDev/TeleBox'>📦仓库</a> | <a href='https://github.com/TeleBoxDev/TeleBox_Plugins'>🔌插件</a>"
         ].join('\n');
         
         await msg.edit({ text: helpText, parseMode: "html" });
@@ -103,7 +101,7 @@ const helpPlugin: Plugin = {
       
       if (!plugin) {
         await msg.edit({
-          text: `❌ 未找到命令 <code>${htmlEscape(command)}</code>\n\n使用 <code>.help</code> 查看所有命令`,
+          text: `❌ 未找到命令 <code>${htmlEscape(command)}</code>\n\n💡 使用 <code>.help</code> 查看所有命令`,
           parseMode: "html"
         });
         return;
@@ -111,14 +109,21 @@ const helpPlugin: Plugin = {
       
       // 格式化命令别名
       const aliases = Array.isArray(plugin.command) ? plugin.command : [plugin.command];
-      const aliasText = aliases.map(alias => `<code>.${alias}</code>`).join(', ');
+      const aliasText = aliases.map(alias => `<code>.${alias}</code>`).join(' • ');
       
       const commandHelpText = [
-        `🔧 <b>${htmlEscape(command)}</b>`,
-        `${htmlEscape(plugin.description || '无描述')}`,
+        `🔧 <b>${htmlEscape(command.toUpperCase())}</b>`,
         "",
-        `别名: ${aliasText}`,
-        `用法: <code>.${command}</code>`
+        `📝 <b>功能描述:</b>`,
+        `${htmlEscape(plugin.description || '暂无描述信息')}`,
+        "",
+        `🏷️ <b>命令别名:</b>`,
+        `${aliasText}`,
+        "",
+        `⚡ <b>使用方法:</b>`,
+        `<code>.${command} [参数]</code>`,
+        "",
+        "💡 <i>提示: 使用</i> <code>.help</code> <i>查看所有命令</i>"
       ].join('\n');
       
       await msg.edit({ text: commandHelpText, parseMode: "html" });
@@ -128,11 +133,17 @@ const helpPlugin: Plugin = {
       const errorMsg = error.message?.length > 100 ? error.message.substring(0, 100) + '...' : error.message;
       await msg.edit({
         text: [
-          "❌ <b>帮助系统错误</b>",
+          "⚠️ <b>系统错误</b>",
           "",
-          `<b>错误信息:</b> <code>${htmlEscape(errorMsg || '未知错误')}</code>`,
+          "📋 <b>错误详情:</b>",
+          `<code>${htmlEscape(errorMsg || '未知系统错误')}</code>`,
           "",
-          "🔄 请稍后重试或联系管理员"
+          "🔧 <b>解决方案:</b>",
+          "• 稍后重试命令",
+          "• 重启 TeleBox 服务",
+          "• 检查系统日志",
+          "",
+          "🆘 <a href='https://github.com/TeleBoxDev/TeleBox/issues'>反馈问题</a>"
         ].join('\n'),
         parseMode: "html"
       });
