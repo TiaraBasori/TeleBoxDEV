@@ -88,7 +88,8 @@ const helpPlugin: Plugin = {
           "",
           formatCommandList(commands),
           "",
-          "💡 <code>.help [命令]</code> 查看详情 | <a href='https://github.com/TeleBoxDev/TeleBox'>📦仓库</a> | <a href='https://github.com/TeleBoxDev/TeleBox_Plugins'>🔌插件</a>"
+          "💡 <code>.help [命令]</code> 查看详情 | <code>.npm search</code> 显示远程插件列表",
+          "🔗 <a href='https://github.com/TeleBoxDev/TeleBox'>📦仓库</a> | <a href='https://github.com/TeleBoxDev/TeleBox_Plugins'>🔌插件</a>"
         ].join('\n');
         
         await msg.edit({ text: helpText, parseMode: "html" });
