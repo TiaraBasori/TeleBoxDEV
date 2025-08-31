@@ -40,7 +40,9 @@ async function update(force = false, msg: Api.Message) {
   } catch (error: any) {
     console.error("❌ 更新失败:", error);
     await msg.edit({
-      text: `❌ 更新失败\n失败命令行：${error.cmd}\n失败原因：${error.stderr}`,
+      text:
+        `❌ 更新失败\n失败命令行：${error.cmd}\n失败原因：${error.stderr}\n\n` +
+        "如果是 Git 冲突，请手动解决后再更新，或使用 .update -f 强制更新（会丢弃本地改动）",
     });
   }
 }

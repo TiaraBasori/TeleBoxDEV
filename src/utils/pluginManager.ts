@@ -153,6 +153,7 @@ async function loadPlugins() {
 }
 
 export {
+  getPrefixs,
   loadPlugins,
   listCommands,
   getPlugin,

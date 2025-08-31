@@ -1,4 +1,4 @@
-import { listCommands, getPlugin } from "@utils/pluginManager";
+import { listCommands, getPlugin, getPrefixs } from "@utils/pluginManager";
 import { Plugin } from "@utils/pluginBase";
 import fs from "fs";
 import path from "path";
@@ -82,13 +82,15 @@ const helpPlugin: Plugin = {
         const commands = listCommands();
         const version = readVersion();
         const totalCommands = commands.length;
+        const prefiexs = getPrefixs();
         
         const helpText = [
           `🚀 <b>TeleBox v${htmlEscape(version)}</b> | ${totalCommands}个命令`,
           "",
           formatCommandList(commands),
           "",
-          "💡 <code>.help [命令]</code> 查看详情 | <code>.npm search</code> 显示远程插件列表",
+          `❕ <b>指令前缀：</b> ${prefiexs.map(p => `<code>${htmlEscape(p)}</code>`).join(' • ')}`,
+          `💡 <code>${prefiexs[0]}help [命令]</code> 查看详情 | <code>${prefiexs[0]}npm search</code> 显示远程插件列表`,
           "🔗 <a href='https://github.com/TeleBoxDev/TeleBox'>📦仓库</a> | <a href='https://github.com/TeleBoxDev/TeleBox_Plugins'>🔌插件</a>"
         ].join('\n');
         
