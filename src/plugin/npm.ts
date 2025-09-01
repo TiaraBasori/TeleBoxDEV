@@ -99,9 +99,46 @@ async function search(msg: Api.Message) {
   const res = await axios.get(url);
   if (res.status === 200) {
     const plugins = Object.keys(res.data);
-    const pluginList = plugins.map(plugin => `• <code>${plugin}</code>`).join("\n");
+    
+    // 插件描述映射
+    const pluginDescriptions: { [key: string]: string } = {
+      "aban": "用户权限管理，多群组操作",
+      "bulk_delete": "批量删除消息工具",
+      "clean_member": "群组成员清理工具",
+      "da": "删除群内所有消息",
+      "dc": "获取数据中心信息",
+      "dig": "DNS 查询工具",
+      "dme": "删除自己的消息",
+      "eat": "生成吃掉表情包",
+      "forward_cron": "定时转发消息",
+      "gpt": "OpenAI GPT 聊天助手",
+      "gt": "谷歌翻译插件",
+      "ip": "IP 地址查询工具",
+      "keyword": "关键词自动回复",
+      "komari": "服务器监控插件",
+      "lottery": "群组抽奖系统",
+      "music": "YouTube 音乐下载",
+      "netease": "网易云音乐播放",
+      "pin_cron": "定时置顶消息",
+      "pm2": "PM2 进程管理",
+      "pmcaptcha": "私聊验证系统",
+      "q": "消息引用生成器",
+      "search": "频道消息搜索",
+      "send_cron": "定时发送消息",
+      "shift": "智能消息转发",
+      "speednext": "网络速度测试",
+      "yt-dlp": "YouTube 视频下载"
+    };
+    
+    const pluginList = plugins.map(plugin => {
+      const description = pluginDescriptions[plugin] || "暂无描述";
+      return `• <code>${plugin}</code> - ${description}`;
+    }).join("\n");
+    
     const installTip = `\n\n💡 <b>安装方法:</b> <code>npm i &lt;插件名&gt;</code>`;
     const repoLink = `\n\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
+    
+    // 确保消息不超过Telegram限制
     await msg.edit({ 
       text: `🔍 <b>远程插件列表:</b>\n\n${pluginList}${installTip}${repoLink}`,
       parseMode: "html"
