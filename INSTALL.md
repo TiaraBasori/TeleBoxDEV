@@ -8,7 +8,7 @@
 
 **现代化 Telegram Bot 开发框架完整部署指南**
 
-*基于 Node.js 构建的高性能 Telegram Bot 项目*
+_基于 Node.js 构建的高性能 Telegram Bot 项目_
 
 </div>
 
@@ -47,6 +47,7 @@ sudo apt install -y curl git build-essential
 ```
 
 **📋 安装组件说明：**
+
 - `curl` - 用于下载 Node.js 安装脚本
 - `git` - 版本控制工具，用于克隆项目
 - `build-essential` - 编译工具链，用于构建原生模块
@@ -66,7 +67,12 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 ```
 
+#### 若你已使用了 Node.js 版本管理工具
+
+本项目中已提供了 `.nvmrc` 文件，通常 Node.js 版本管理工具会自动识别并在当前工作区/运行目录切换到该版本。
+
 **✅ 验证安装：**
+
 ```bash
 node --version    # 应显示 v20.x.x
 npm --version     # 应显示对应的 npm 版本
@@ -91,6 +97,7 @@ git clone https://github.com/TeleBoxDev/TeleBox.git .
 ```
 
 **📋 目录结构：**
+
 ```
 ~/telebox/
 ├── 📦 src/          # 源代码
@@ -112,6 +119,7 @@ npm install
 ```
 
 **🔄 安装过程说明：**
+
 - 自动下载并安装 `package.json` 中定义的所有依赖
 - 包括 TypeScript、GramJS、数据库驱动等核心组件
 - 安装完成后会生成 `node_modules/` 目录
@@ -136,15 +144,19 @@ npm start
 **📝 配置流程：**
 
 1. **🔑 API 凭据配置**
+
    ```
    需要填写：api_id 和 api_hash
    ```
+
    > 💡 从 [my.telegram.org](https://my.telegram.org) 获取 API 凭据
 
 2. **📱 手机号验证**
+
    ```
    Please enter your number: +18888888888
    ```
+
    > 🔢 输入完整的国际格式手机号（包含国家代码）
 
 3. **✅ 登录成功确认**
@@ -161,12 +173,14 @@ npm start
 <summary><b>🔄 点击展开 PM2 部署步骤</b></summary>
 
 **📦 安装 PM2 进程管理器：**
+
 ```bash
 # 🌐 全局安装 PM2
 npm install -g pm2
 ```
 
 **🚀 启动 TeleBox 服务：**
+
 ```bash
 # 🎯 使用 PM2 启动服务
 pm2 start npm --name telebox -- start
@@ -179,12 +193,17 @@ sudo pm2 startup systemd
 ```
 
 **📊 监控和管理：**
+
 ```bash
 # 📋 查看服务状态
 pm2 status
 
 # 📝 查看运行日志
 pm2 logs telebox
+
+# 可选插件
+## pm2-logrotate 日志管理及分割
+pm2 install pm2-logrotate
 
 # 🔄 重启服务
 pm2 restart telebox
@@ -194,6 +213,7 @@ pm2 stop telebox
 ```
 
 **🎯 PM2 管理命令：**
+
 - `pm2 list` - 📋 查看所有进程
 - `pm2 monit` - 📊 实时监控面板
 - `pm2 reload telebox` - 🔄 无缝重载
@@ -210,8 +230,9 @@ pm2 stop telebox
 **TeleBox 现在已成功部署并运行！**
 
 [![返回主页](https://img.shields.io/badge/🏠_返回主页-README.md-blue?style=for-the-badge)](#)
+
 <!-- 🔗 TODO: 上传到远程后，请将上方链接替换为 README.md 的实际远程链接 -->
 
-*如有问题，请查看* [**📋 故障排除**](#) *或* [**🆘 问题反馈**](https://github.com/TeleBoxDev/TeleBox/issues)
+_如有问题，请查看_ [**📋 故障排除**](#) _或_ [**🆘 问题反馈**](https://github.com/TeleBoxDev/TeleBox/issues)
 
 </div>
