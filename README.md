@@ -274,7 +274,7 @@ interface Plugin {
 
 ### 📥 **安装部署**
 
-[![安装指南](https://img.shields.io/badge/📋_完整安装指南-点击查看-green?style=for-the-badge)](#)
+[![安装指南](https://img.shields.io/badge/📋_完整安装指南-点击查看-green?style=for-the-badge)]([INSTALL.md](https://github.com/TeleBoxDev/TeleBox/raw/refs/heads/main/INSTALL.md))
 <!-- 🔗 TODO: 上传到远程后，请将上方链接替换为 INSTALL.md 的实际远程链接 -->
 
 </div>
