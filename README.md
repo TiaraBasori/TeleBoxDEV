@@ -274,7 +274,7 @@ interface Plugin {
 
 ### 📥 **安装部署**
 
-[![安装指南](https://img.shields.io/badge/📋_完整安装指南-点击查看-green?style=for-the-badge)](https://github.com/TeleBoxDev/TeleBox/raw/refs/heads/main/INSTALL.md)
+[![安装指南](https://img.shields.io/badge/📋_完整安装指南-点击查看-green?style=for-the-badge)](https://github.com/TeleBoxDev/TeleBox/blob/main/INSTALL.md)
 
 </div>
 
@@ -336,7 +336,7 @@ NODE_ENV=development npm run dev
 </td>
 <td align="center" width="20%">
 
-[![安装指南](https://img.shields.io/badge/📋_安装指南-INSTALL.md-orange?style=for-the-badge)](https://github.com/TeleBoxDev/TeleBox/raw/refs/heads/main/INSTALL.md)
+[![安装指南](https://img.shields.io/badge/📋_安装指南-INSTALL.md-orange?style=for-the-badge)](https://github.com/TeleBoxDev/TeleBox/blob/main/INSTALL.md)
 
 </td>
 <td align="center" width="20%">
