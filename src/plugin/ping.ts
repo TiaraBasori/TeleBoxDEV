@@ -7,6 +7,8 @@ import { createConnection } from "net";
 import { createDirectoryInAssets } from "@utils/pathHelpers";
 import Database from "better-sqlite3";
 import path from "path";
+import { PromisedNetSockets } from "telegram/extensions";
+import * as dns from "dns";
 
 const execAsync = promisify(exec);
 
@@ -30,7 +32,34 @@ function htmlEscape(text: string): string {
 }
 
 /**
- * TCP连接测试 - 类似HTTP ping
+ * 使用Telegram网络栈的TCP连接测试
+ */
+async function telegramTcpPing(hostname: string, port: number = 80, timeout: number = 3000): Promise<number> {
+  return new Promise(async (resolve) => {
+    try {
+      const socket = new PromisedNetSockets();
+      const start = performance.now();
+      
+      // 设置超时
+      const timeoutId = setTimeout(() => {
+        socket.close();
+        resolve(-1);
+      }, timeout);
+      
+      await socket.connect(port, hostname);
+      const end = performance.now();
+      
+      clearTimeout(timeoutId);
+      await socket.close();
+      resolve(Math.round(end - start));
+    } catch (error) {
+      resolve(-1);
+    }
+  });
+}
+
+/**
+ * 传统TCP连接测试 - 备用方法
  */
 async function tcpPing(hostname: string, port: number = 80, timeout: number = 3000): Promise<number> {
   return new Promise((resolve) => {
@@ -56,52 +85,79 @@ async function tcpPing(hostname: string, port: number = 80, timeout: number = 30
 }
 
 /**
- * 系统ICMP ping命令
+ * HTTP请求延迟测试 - 模拟ping
+ */
+async function httpPing(hostname: string, useHttps: boolean = false): Promise<number> {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const protocol = useHttps ? require('https') : require('http');
+    const port = useHttps ? 443 : 80;
+    
+    const req = protocol.request({
+      hostname,
+      port,
+      path: '/',
+      method: 'HEAD',
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'TeleBox-Ping/1.0'
+      }
+    }, (res: any) => {
+      const end = performance.now();
+      req.destroy();
+      resolve(Math.round(end - start));
+    });
+    
+    req.on('error', () => {
+      resolve(-1);
+    });
+    
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(-1);
+    });
+    
+    req.end();
+  });
+}
+
+/**
+ * DNS解析延迟测试
+ */
+async function dnsLookupTime(hostname: string): Promise<{ time: number; ip: string }> {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    dns.lookup(hostname, (err, address) => {
+      const end = performance.now();
+      if (err) {
+        resolve({ time: -1, ip: '' });
+      } else {
+        resolve({ time: Math.round(end - start), ip: address });
+      }
+    });
+  });
+}
+
+/**
+ * 系统ICMP ping命令 (Linux)
  */
 async function systemPing(target: string, count: number = 3): Promise<{ avg: number; loss: number; output: string }> {
   try {
-    const isWindows = process.platform === 'win32';
-    const pingCmd = isWindows 
-      ? `ping -n ${count} ${target}`
-      : `ping -c ${count} ${target}`;
+    const pingCmd = `ping -c ${count} -W 5 ${target}`;
+    const { stdout, stderr } = await execAsync(pingCmd, { timeout: 10000 });
     
-    const { stdout, stderr } = await execAsync(pingCmd);
-    
-    if (stderr) {
-      throw new Error(stderr);
-    }
-    
-    // 解析ping结果
+    // 解析Linux ping结果
     let avgTime = -1;
     let packetLoss = 100;
     
-    if (isWindows) {
-      // Windows ping输出解析 - 修复中文输出解析
-      const avgMatch = stdout.match(/平均 = (\d+)ms|Average = (\d+)ms/);
-      const lossMatch = stdout.match(/(\d+)% 丢失|(\d+)% loss/);
-      
-      if (avgMatch) {
-        avgTime = parseInt(avgMatch[1] || avgMatch[2]);
-      } else {
-        // 如果没有找到平均值，检查是否有时间<1ms的情况
-        if (stdout.includes('时间<1ms') || stdout.includes('time<1ms')) {
-          avgTime = 0; // 小于1ms显示为0ms
-        }
-      }
-      if (lossMatch) {
-        packetLoss = parseInt(lossMatch[1] || lossMatch[2]);
-      }
-    } else {
-      // Linux/macOS ping输出解析
-      const avgMatch = stdout.match(/avg\/[^=]+=([0-9.]+)/);
-      const lossMatch = stdout.match(/(\d+)% packet loss/);
-      
-      if (avgMatch) {
-        avgTime = Math.round(parseFloat(avgMatch[1]));
-      }
-      if (lossMatch) {
-        packetLoss = parseInt(lossMatch[1]);
-      }
+    const avgMatch = stdout.match(/avg\/[^=]+=([0-9.]+)/);
+    const lossMatch = stdout.match(/(\d+)% packet loss/);
+    
+    if (avgMatch) {
+      avgTime = Math.round(parseFloat(avgMatch[1]));
+    }
+    if (lossMatch) {
+      packetLoss = parseInt(lossMatch[1]);
     }
     
     return {
@@ -110,49 +166,35 @@ async function systemPing(target: string, count: number = 3): Promise<{ avg: num
       output: stdout
     };
   } catch (error: any) {
-    throw new Error(`Ping失败: ${error.message}`);
+    if (error.code === 'ETIMEDOUT') {
+      throw new Error('执行超时');
+    } else if (error.killed) {
+      throw new Error('命令被终止');
+    } else {
+      throw new Error(`Ping失败: ${error.message}`);
+    }
   }
 }
 
 /**
- * 测试所有数据中心延迟 (参考PagerMaid-Modify实现)
+ * 测试所有数据中心延迟 (Linux)
  */
 async function pingDataCenters(): Promise<string[]> {
   const results: string[] = [];
-  const isWindows = process.platform === 'win32';
   
   for (let dc = 1; dc <= 5; dc++) {
     const ip = DCs[dc as keyof typeof DCs];
     try {
-      let pingTime = "0";
+      // Linux: 使用awk提取时间
+      const { stdout } = await execAsync(
+        `ping -c 1 ${ip} | awk -F 'time=' '/time=/ {print $2}' | awk '{print $1}'`
+      );
       
-      if (isWindows) {
-        // Windows: 使用简化的ping命令
-        const { stdout } = await execAsync(`ping -n 1 ${ip}`);
-        
-        // 提取延迟时间 - 修复PagerMaid的解析问题
-        const timeMatch = stdout.match(/时间[<=](\d+)ms|time[<=](\d+)ms/);
-        if (timeMatch) {
-          pingTime = timeMatch[1] || timeMatch[2] || "0";
-        } else if (stdout.includes('时间<1ms') || stdout.includes('time<1ms')) {
-          pingTime = "0";
-        } else {
-          // 从统计信息中提取平均值
-          const avgMatch = stdout.match(/平均 = (\d+)ms|Average = (\d+)ms/);
-          if (avgMatch) {
-            pingTime = avgMatch[1] || avgMatch[2];
-          }
-        }
-      } else {
-        // Linux/macOS: 使用awk提取时间
-        const { stdout } = await execAsync(
-          `ping -c 1 ${ip} | awk -F 'time=' '/time=/ {print $2}' | awk '{print $1}'`
-        );
-        try {
-          pingTime = String(Math.round(parseFloat(stdout.trim())));
-        } catch {
-          pingTime = "0";
-        }
+      let pingTime = "0";
+      try {
+        pingTime = String(Math.round(parseFloat(stdout.trim())));
+      } catch {
+        pingTime = "0";
       }
       
       const dcLocation = dc === 1 || dc === 3 ? "Miami" : 
@@ -272,38 +314,59 @@ const pingPlugin: Plugin = {
       // 执行多种测试
       const results: string[] = [];
       
-      // ICMP Ping测试
+      // DNS解析测试
+      const dnsResult = await dnsLookupTime(testTarget);
+      if (dnsResult.time > 0) {
+        results.push(`🔍 <b>DNS解析:</b> <code>${dnsResult.time}ms</code> → <code>${dnsResult.ip}</code>`);
+      }
+      
+      // ICMP Ping测试（尝试但可能失败）
       try {
         const pingResult = await systemPing(testTarget, 3);
-        if (pingResult.avg > 0) {
-          results.push(`🏓 <b>ICMP Ping:</b> <code>${pingResult.avg}ms</code> (丢包: ${pingResult.loss}%)`);
+        if (pingResult.avg >= 0 && pingResult.loss < 100) {
+          const avgText = pingResult.avg === 0 ? '<1' : pingResult.avg.toString();
+          results.push(`🏓 <b>ICMP Ping:</b> <code>${avgText}ms</code> (丢包: ${pingResult.loss}%)`);
         } else {
-          results.push(`🏓 <b>ICMP Ping:</b> <code>超时/失败</code>`);
+          // ICMP失败，使用HTTP ping作为替代
+          const httpResult = await httpPing(testTarget, false);
+          if (httpResult > 0) {
+            results.push(`🏓 <b>HTTP Ping:</b> <code>${httpResult}ms</code> (ICMP不可用)`);
+          } else {
+            results.push(`🏓 <b>ICMP Ping:</b> <code>不可用</code>`);
+          }
         }
       } catch (error: any) {
-        results.push(`🏓 <b>ICMP Ping:</b> <code>错误</code>`);
-      }
-      
-      // TCP连接测试 (HTTP端口)
-      try {
-        const tcpResult = await tcpPing(testTarget, 80, 5000);
-        if (tcpResult > 0) {
-          results.push(`🌐 <b>TCP连接 (80):</b> <code>${tcpResult}ms</code>`);
+        // ICMP失败，尝试HTTP ping
+        const httpResult = await httpPing(testTarget, false);
+        if (httpResult > 0) {
+          results.push(`🏓 <b>HTTP Ping:</b> <code>${httpResult}ms</code> (ICMP受限)`);
         } else {
-          results.push(`🌐 <b>TCP连接 (80):</b> <code>超时/拒绝</code>`);
+          results.push(`🏓 <b>网络测试:</b> <code>ICMP/HTTP均不可用</code>`);
         }
-      } catch (error) {
-        // TCP测试失败不显示错误，因为很多服务器不开放80端口
       }
       
-      // HTTPS端口测试
-      try {
-        const httpsResult = await tcpPing(testTarget, 443, 5000);
-        if (httpsResult > 0) {
-          results.push(`🔒 <b>TCP连接 (443):</b> <code>${httpsResult}ms</code>`);
-        }
-      } catch (error) {
-        // HTTPS测试失败不显示错误
+      // 使用Telegram网络栈测试TCP连接
+      const telegramTcp80 = await telegramTcpPing(testTarget, 80, 5000);
+      const telegramTcp443 = await telegramTcpPing(testTarget, 443, 5000);
+      
+      // 如果Telegram网络栈失败，回退到传统方法
+      const tcp80 = telegramTcp80 > 0 ? telegramTcp80 : await tcpPing(testTarget, 80, 5000);
+      const tcp443 = telegramTcp443 > 0 ? telegramTcp443 : await tcpPing(testTarget, 443, 5000);
+      
+      if (tcp80 > 0) {
+        const method = telegramTcp80 > 0 ? 'TG' : 'TCP';
+        results.push(`🌐 <b>${method}连接 (80):</b> <code>${tcp80}ms</code>`);
+      }
+      
+      if (tcp443 > 0) {
+        const method = telegramTcp443 > 0 ? 'TG' : 'TCP';
+        results.push(`🔒 <b>${method}连接 (443):</b> <code>${tcp443}ms</code>`);
+      }
+      
+      // HTTPS请求测试（应用层延迟）
+      const httpsResult = await httpPing(testTarget, true);
+      if (httpsResult > 0) {
+        results.push(`📡 <b>HTTPS请求:</b> <code>${httpsResult}ms</code>`);
       }
       
       if (results.length === 0) {
@@ -313,8 +376,19 @@ const pingPlugin: Plugin = {
       const targetType = parsed.type === 'dc' ? '数据中心' : 
                         parsed.type === 'ip' ? 'IP地址' : '域名';
       
+      // 构建显示文本，避免重复显示相同内容
+      let displayText = `🎯 <b>${targetType}延迟测试</b>\n`;
+      
+      if (target === testTarget) {
+        // 输入和目标相同时，只显示一次
+        displayText += `<code>${htmlEscape(target)}</code>\n\n`;
+      } else {
+        // 输入和目标不同时（如dc1 → IP），显示映射关系
+        displayText += `<code>${htmlEscape(target)}</code> → <code>${htmlEscape(testTarget)}</code>\n\n`;
+      }
+      
       await msg.edit({
-        text: `🎯 <b>${targetType}延迟测试</b>\n<code>${htmlEscape(target)}</code> → <code>${htmlEscape(testTarget)}</code>\n\n${results.join('\n')}\n\n⏰ <i>${new Date().toLocaleString('zh-CN')}</i>`,
+        text: `${displayText}${results.join('\n')}\n\n⏰ <i>${new Date().toLocaleString('zh-CN')}</i>`,
         parseMode: "html",
       });
       
