@@ -1,10 +1,12 @@
 import readline from "readline";
 import { getGlobalClient } from "@utils/globalClient";
+import { storeStringSession } from "./apiConfig";
+import { StringSession } from "telegram/sessions";
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
-  terminal: false
+  terminal: false,
 });
 
 export async function login() {
@@ -26,5 +28,7 @@ export async function login() {
       ),
     onError: (err) => console.log(err),
   });
+  const session = (client.session as StringSession).save();
+  storeStringSession(session);
   console.log("You should now be connected.");
 }

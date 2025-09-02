@@ -2,9 +2,10 @@ import fs from "fs";
 import path from "path";
 import readline from "readline";
 
-export interface TelegramAPI {
-  api_id: number;
-  api_hash: string;
+interface TelegramAPI {
+  api_id?: number;
+  api_hash?: string;
+  session?: string;
 }
 
 const CONFIG_PATH = path.join(process.cwd(), "config.json");
@@ -15,7 +16,7 @@ function ensureConfigFileExists(): void {
   }
 }
 
-function loadConfig(): Partial<TelegramAPI> {
+function loadConfig(): TelegramAPI {
   ensureConfigFileExists();
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
@@ -34,7 +35,7 @@ function promptInput(question: string): Promise<string> {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: false
+    terminal: false,
   });
 
   return new Promise((resolve) => {
@@ -44,8 +45,14 @@ function promptInput(question: string): Promise<string> {
   });
 }
 
+function storeStringSession(session: string): void {
+  const config = loadConfig();
+  config.session = session;
+  saveConfig(config);
+}
+
 async function initConfig(): Promise<TelegramAPI> {
-  const config = loadConfig() ?? {};
+  const config = loadConfig();
 
   let { api_id, api_hash } = config;
 
@@ -76,14 +83,16 @@ async function initConfig(): Promise<TelegramAPI> {
     return newConfig;
   }
 
-  return config as TelegramAPI;
+  return config;
 }
 
 let configPromise: Promise<TelegramAPI> | null = null;
 
-export default function getApiConfig(): Promise<TelegramAPI> {
+function getApiConfig(): Promise<TelegramAPI> {
   if (!configPromise) {
     configPromise = initConfig();
   }
   return configPromise;
 }
+
+export { getApiConfig, storeStringSession };

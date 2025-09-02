@@ -2,8 +2,6 @@
 config.json
 assets/*
 !assets/.gitkeep
-my_session/*
-!my_session/.gitkeep
 plugins/*
 !plugins/.gitkeep
 temp/*
