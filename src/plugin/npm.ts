@@ -37,6 +37,121 @@ async function installRemotePlugin(plugin: string, msg: Api.Message) {
   }
 }
 
+async function installAllPlugins(msg: Api.Message) {
+  await msg.edit({ text: "🔍 正在获取远程插件列表..." });
+  
+  const url = `https://github.com/TeleBoxDev/TeleBox_Plugins/blob/main/plugins.json?raw=true`;
+  try {
+    const res = await axios.get(url);
+    if (res.status !== 200) {
+      await msg.edit({ text: "❌ 无法获取远程插件库" });
+      return;
+    }
+
+    const plugins = Object.keys(res.data);
+    const totalPlugins = plugins.length;
+    
+    if (totalPlugins === 0) {
+      await msg.edit({ text: "📦 远程插件库为空" });
+      return;
+    }
+
+    let installedCount = 0;
+    let failedCount = 0;
+    const failedPlugins: string[] = [];
+
+    await msg.edit({ 
+      text: `📦 开始安装 ${totalPlugins} 个插件...\n\n🔄 进度: 0/${totalPlugins} (0%)`,
+      parseMode: "html"
+    });
+
+    for (let i = 0; i < plugins.length; i++) {
+      const plugin = plugins[i];
+      const progress = Math.round(((i + 1) / totalPlugins) * 100);
+      const progressBar = generateProgressBar(progress);
+      
+      try {
+        // 更新进度显示
+        await msg.edit({ 
+          text: `📦 正在安装插件: <code>${plugin}</code>\n\n${progressBar}\n🔄 进度: ${i + 1}/${totalPlugins} (${progress}%)\n✅ 成功: ${installedCount}\n❌ 失败: ${failedCount}`,
+          parseMode: "html"
+        });
+
+        const pluginData = res.data[plugin];
+        if (!pluginData || !pluginData.url) {
+          failedCount++;
+          failedPlugins.push(`${plugin} (无URL)`);
+          continue;
+        }
+
+        const pluginUrl = pluginData.url;
+        const response = await axios.get(pluginUrl);
+        
+        if (response.status !== 200) {
+          failedCount++;
+          failedPlugins.push(`${plugin} (下载失败)`);
+          continue;
+        }
+
+        // 检查插件是否已存在
+        const filePath = path.join(PLUGIN_PATH, `${plugin}.ts`);
+        if (fs.existsSync(filePath)) {
+          // 备份现有插件
+          const backupPath = path.join(PLUGIN_PATH, `${plugin}.ts.backup`);
+          fs.copyFileSync(filePath, backupPath);
+        }
+
+        // 保存插件文件
+        fs.writeFileSync(filePath, response.data);
+        installedCount++;
+        
+        // 短暂延迟避免API限制
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (error) {
+        failedCount++;
+        failedPlugins.push(`${plugin} (${error})`);
+        console.error(`[NPM] 安装插件 ${plugin} 失败:`, error);
+      }
+    }
+
+    // 重新加载所有插件
+    try {
+      await loadPlugins();
+    } catch (error) {
+      console.error("[NPM] 重新加载插件失败:", error);
+    }
+
+    // 显示最终结果
+    const successBar = generateProgressBar(100);
+    let resultMsg = `🎉 <b>批量安装完成!</b>\n\n${successBar}\n\n📊 <b>安装统计:</b>\n✅ 成功安装: ${installedCount}/${totalPlugins}\n❌ 安装失败: ${failedCount}/${totalPlugins}`;
+    
+    if (failedPlugins.length > 0) {
+      const failedList = failedPlugins.slice(0, 5).join('\n• ');
+      const moreFailures = failedPlugins.length > 5 ? `\n• ... 还有 ${failedPlugins.length - 5} 个失败` : '';
+      resultMsg += `\n\n❌ <b>失败列表:</b>\n• ${failedList}${moreFailures}`;
+    }
+    
+    resultMsg += `\n\n🔄 插件已重新加载，可以开始使用!`;
+    
+    await msg.edit({ 
+      text: resultMsg,
+      parseMode: "html"
+    });
+    
+  } catch (error) {
+    await msg.edit({ text: `❌ 批量安装失败: ${error}` });
+    console.error("[NPM] 批量安装插件失败:", error);
+  }
+}
+
+function generateProgressBar(percentage: number, length: number = 20): string {
+  const filled = Math.round((percentage / 100) * length);
+  const empty = length - filled;
+  const bar = '█'.repeat(filled) + '░'.repeat(empty);
+  return `🔄 <b>进度条:</b> [${bar}] ${percentage}%`;
+}
+
 async function installPlugin(args: string[], msg: Api.Message) {
   if (args.length === 1) {
     if (msg.isReply) {
@@ -56,7 +171,11 @@ async function installPlugin(args: string[], msg: Api.Message) {
     }
   } else {
     const packageName = args[1];
-    await installRemotePlugin(packageName, msg);
+    if (packageName === "all") {
+      await installAllPlugins(msg);
+    } else {
+      await installRemotePlugin(packageName, msg);
+    }
   }
 }
 
@@ -135,7 +254,7 @@ async function search(msg: Api.Message) {
       return `• <code>${plugin}</code> - ${description}`;
     }).join("\n");
     
-    const installTip = `\n\n💡 <b>安装方法:</b> <code>npm i &lt;插件名&gt;</code>`;
+    const installTip = `\n\n💡 <b>安装方法:</b>\n• <code>npm i &lt;插件名&gt;</code> - 安装单个插件\n• <code>npm i all</code> - 一键安装全部远程插件`;
     const repoLink = `\n\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
     
     // 确保消息不超过Telegram限制
@@ -153,6 +272,7 @@ const npmPlugin: Plugin = {
   description:
     `本地资源: 对某个文件回复 npm install\n` +
     `远程资源: npm install <plugin_name> || npm i <plugin_name>\n` +
+    `批量安装: npm i all - 一键安装所有远程插件\n` +
     `卸载插件: npm remove <plugin_name> || npm rm <plugin_name> || npm un <plugin_name> || npm uninstall <plugin_name>
     `,
   cmdHandler: async (msg) => {
