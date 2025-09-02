@@ -486,6 +486,54 @@ db.exec(`
 
 ## 📝 代码模式与最佳实践
 
+### 0. 帮助文档格式规范
+```typescript
+// ✅ 正确: 简洁的description，让help.ts自动添加格式
+const plugin: Plugin = {
+  command: ["example"],
+  description: `示例插件功能说明
+
+参数说明:
+• [参数1] - 参数说明
+• -f - 选项说明
+
+核心特性:
+• 特性1
+• 特性2
+
+示例:
+• .example 123 - 示例用法
+
+注意事项:
+• 重要提醒`,
+  
+  cmdHandler: async (msg) => {
+    // help.ts会自动添加:
+    // 🔧 EXAMPLE (标题)
+    // 📝 功能描述: (前缀)
+    // 🏷️ 命令别名: .example
+    // ⚡ 使用方法: .example [参数]
+    // 💡 提示: 使用 .help 查看所有命令
+  }
+};
+
+// ❌ 错误: 重复格式化导致显示混乱
+const badPlugin: Plugin = {
+  description: `🔧 插件标题  // ← 重复! help.ts已自动添加
+  
+用法: .example [参数]  // ← 重复! help.ts已自动添加
+
+📝 功能描述:  // ← 重复! help.ts已自动添加
+插件说明`
+};
+```
+
+**帮助系统统一规范:**
+- ✅ `description` 只包含纯文本说明，无HTML标签和重复格式
+- ✅ `help.ts` 自动处理标题、前缀、命令别名、使用方法
+- ✅ `.help [插件]` 和 `.[插件] help` 显示完全一致
+- ✅ 参数和示例使用简洁文本，避免 `<code>` 标签冲突
+
 ### 1. 参数解析模式
 ```typescript
 const text = msg.message || "";
