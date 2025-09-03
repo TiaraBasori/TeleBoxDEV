@@ -183,7 +183,7 @@ npm install -g pm2
 
 ```bash
 # 🎯 使用 PM2 启动服务
-pm2 start npm --name telebox -- start
+pm2 start "npm start" --name telebox
 
 # 💾 保存 PM2 配置
 pm2 save
