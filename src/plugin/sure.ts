@@ -249,7 +249,7 @@ async function handleMsgList(msg: Api.Message) {
 
 const surePlugin: Plugin = {
   command: ["sure"],
-  description: `赋予其他用户使用 bot 身份发送消息(支持重定向)的权限\n.sure add (回复目标用户的消息或带上 uid/@username) - 添加用户\n.sure del (回复目标用户的消息或带上 uid/@username) - 删除用户\n.sure ls - 列出所有用户\n\n⚠️ 若未设置对话白名单, 所有对话中均可使用\n.sure chat add (在当前对话中使用 或带上 id/@name) - 添加对话到白名单\n.sure chat del (在当前对话中使用 或带上 id/@name) - 从白名单删除对话\n.sure chat ls/list - 列出对话白名单\n\n⚠️ 需设置消息白名单方可使用\n.sure msg add 消息(使用原始字符串, 即可包含空格) - 添加消息白名单\n.sure msg redirect ID 重定向消息(使用原始字符串, 即可包含空格) - 使用消息的 ID 为消息设置重定向(设置空即为清除重定向)\n.sure msg del ID - 使用消息的 ID 从白名单删除消息\n.sure msg ls/list - 列出消息白名单`,
+  description: `赋予其他用户使用 bot 身份发送消息(支持重定向)的权限\n.sure add (回复目标用户的消息或带上 uid/@username) - 添加用户\n.sure del (回复目标用户的消息或带上 uid/@username) - 删除用户\n.sure ls - 列出所有用户\n\n⚠️ 若未设置对话白名单, 所有对话中均可使用\n.sure chat add (在当前对话中使用 或带上 id/@name) - 添加对话到白名单\n.sure chat del (在当前对话中使用 或带上 id/@name) - 从白名单删除对话\n.sure chat ls/list - 列出对话白名单\n\n⚠️ 需设置消息白名单方可使用\n.sure msg add 消息(使用原始字符串, 即可包含空格) - 添加消息白名单\n⚠️ 若以 _command: 开头, 认为此消息是命令, 即 _command:/sb 可匹配 /sb 和 /sb uid. 若设置了重定向为 /spam, 则会自动变成 /spam 和 /spam uid\n.sure msg redirect ID 重定向消息(使用原始字符串, 即可包含空格) - 使用消息的 ID 为消息设置重定向(设置空即为清除重定向)\n.sure msg del ID - 使用消息的 ID 从白名单删除消息\n.sure msg ls/list - 列出消息白名单`,
   cmdHandler: async (msg) => {
     const parts = msg.message.trim().split(/\s+/);
     let command = parts[1];
@@ -324,10 +324,23 @@ const surePlugin: Plugin = {
     const cids = getSureCids();
     if (cids.length > 0 && !cids.includes(cid)) return;
     const msgs = getSureMsgs();
-    const matchedMsg = msgs.find((m) => m.msg === msg.message);
+    let replacedMsg = null;
+    const matchedMsg = msgs.find((m) => {
+      if (m.msg.startsWith("_command:")) {
+        const prefix = m.msg.replace("_command:", "");
+        const isStartsWith = msg.message.startsWith(prefix);
+        const suffix = msg.message.replace(prefix, "");
+        const matched = isStartsWith && (!suffix || suffix.startsWith(" "));
+        if (matched && m.redirect) {
+          replacedMsg = msg.message.replace(prefix, m.redirect);
+        }
+        return matched;
+      }
+      return m.msg === msg.message;
+    });
     if (!matchedMsg) return;
 
-    const message = matchedMsg.redirect || msg.message;
+    const message = replacedMsg || matchedMsg.redirect || msg.message;
     const cmd = await getCommandFromMessage(message);
 
     const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
