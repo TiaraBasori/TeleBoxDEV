@@ -327,11 +327,11 @@ const surePlugin: Plugin = {
     const matchedMsg = msgs.find((m) => m.msg === msg.message);
     if (!matchedMsg) return;
 
-    msg.message = matchedMsg.redirect || msg.message;
-    const cmd = await getCommandFromMessage(msg);
+    const message = matchedMsg.redirect || msg.message;
+    const cmd = await getCommandFromMessage(message);
 
     const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
-      message: msg.message,
+      message,
       replyTo: msg.replyToMsgId,
     });
     if (cmd && sudoMsg)

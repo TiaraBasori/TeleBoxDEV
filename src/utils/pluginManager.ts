@@ -41,16 +41,16 @@ async function setPlugins(basePath: string) {
       // 只存第一个，这样才不会影响到监听函数的实行，不会多添加同一插件的多个监听函数
       basePlugins.set(commands[0], plugin);
       for (const command of commands) {
-      plugins.set(command, plugin);
-      // 设置 alias 命令回复
-      const db = new AliasDB();
-      const alias = db.get(command);
-      db.close();
-      if (alias) {
-        plugins.set(alias, plugin);
+        plugins.set(command, plugin);
+        // 设置 alias 命令回复
+        const db = new AliasDB();
+        const alias = db.get(command);
+        db.close();
+        if (alias) {
+          plugins.set(alias, plugin);
+        }
       }
     }
-  }
   }
 }
 
@@ -69,9 +69,11 @@ function listCommands(): string[] {
   return cmds;
 }
 
-async function getCommandFromMessage(msg: Api.Message): Promise<string | null> {
+async function getCommandFromMessage(
+  msg: Api.Message | string
+): Promise<string | null> {
   let prefixs = getPrefixs();
-  const text = msg.message;
+  const text = typeof msg === "string" ? msg : msg.message;
   if (!prefixs.some((p) => text.startsWith(p))) return null;
   const [cmd] = text.slice(1).split(" ");
   if (!cmd) return null;
