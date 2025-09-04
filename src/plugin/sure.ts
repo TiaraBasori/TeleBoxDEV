@@ -8,7 +8,12 @@ import {
 } from "@utils/pluginManager";
 
 // 简单缓存 sure 用户 ID，减少频繁 IO
-let sureCache = { ids: [] as number[], cids: [] as number[], msgs: [] as any[], ts: 0 };
+let sureCache = {
+  ids: [] as number[],
+  cids: [] as number[],
+  msgs: [] as any[],
+  ts: 0,
+};
 const SURE_CACHE_TTL = 10_000; // 10s
 
 function withSureDB<T>(fn: (db: SureDB) => T): T {
@@ -76,7 +81,7 @@ async function handleAddDel(
         return;
       }
       uid = Number(uid);
-      display = buildDisplay(uid, entity, !!entity?.userId);
+      display = buildDisplay(uid, entity, entity instanceof Api.User);
     } catch {
       await msg.edit({ text: "无法获取用户信息" });
       return;
@@ -146,7 +151,7 @@ async function handleChatAddDel(
         return;
       }
       cid = Number(cid);
-      display = buildDisplay(cid, entity, !!entity?.userId);
+      display = buildDisplay(cid, entity, entity instanceof Api.User);
     } catch {
       await msg.edit({ text: "无法获取对话信息" });
       return;
@@ -195,16 +200,15 @@ async function handleMsgAddDel(
   action: "add" | "del",
   id?: string
 ) {
-  
-  let raw
+  let raw;
   withSureDB((db) => {
     if (action === "add") {
-      if(id) {
-        raw = db.lsMsgs().find(m => m.id === Number(id))?.msg
-        if(!raw) throw new Error(`找不到 ID 为 ${id} 的消息`)
-        db.addMsg(raw, input)
-      }else {
-        db.addMsg(input)
+      if (id) {
+        raw = db.lsMsgs().find((m) => m.id === Number(id))?.msg;
+        if (!raw) throw new Error(`找不到 ID 为 ${id} 的消息`);
+        db.addMsg(raw, input);
+      } else {
+        db.addMsg(input);
       }
     } else {
       db.delMsg(input);
@@ -213,7 +217,12 @@ async function handleMsgAddDel(
   sureCache.ts = 0; // 失效缓存
 
   await msg.edit({
-    text: (raw && !input) ? ` 已清除 ${raw} 的重定向` : `已${action === "add" ? "添加" : "删除"}: <code>${ raw ? `${raw} -> ${input}` : input }</code>`,
+    text:
+      raw && !input
+        ? ` 已清除 ${raw} 的重定向`
+        : `已${action === "add" ? "添加" : "删除"}: <code>${
+            raw ? `${raw} -> ${input}` : input
+          }</code>`,
     parseMode: "html",
   });
   await sleep(2000);
@@ -226,7 +235,14 @@ async function handleMsgList(msg: Api.Message) {
     return;
   }
   await msg.edit({
-    text: `消息白名单列表：\n${msgs.map((m) => `<code>${m.id}</code>: <code>${m.msg}</code>${ m.redirect ? ` -> <code>${m.redirect}</code>` : ''}`).join("\n")}`,
+    text: `消息白名单列表：\n${msgs
+      .map(
+        (m) =>
+          `<code>${m.id}</code>: <code>${m.msg}</code>${
+            m.redirect ? ` -> <code>${m.redirect}</code>` : ""
+          }`
+      )
+      .join("\n")}`,
     parseMode: "html",
   });
 }
@@ -251,27 +267,33 @@ const surePlugin: Plugin = {
     if (command === "msg") {
       let subCommand = parts[2];
       if ((subCommand === "add" || subCommand === "del") && parts[3]) {
-        if(subCommand === "del" && (!parts[3] || isNaN(Number(parts[3])))) {
+        if (subCommand === "del" && (!parts[3] || isNaN(Number(parts[3])))) {
           await msg.edit({ text: "请提供正确的消息 ID" });
           return;
         }
         const subCommandTxt = ` ${subCommand} `;
-        const input = msg.message.substring(msg.message.indexOf(subCommandTxt) + subCommandTxt.length);
-        if(input) {
+        const input = msg.message.substring(
+          msg.message.indexOf(subCommandTxt) + subCommandTxt.length
+        );
+        if (input) {
           await handleMsgAddDel(msg, input, subCommand);
         }
         return;
       }
-      if ((subCommand === "redirect")) {
+      if (subCommand === "redirect") {
         const id = parts[3];
-        if(!id || isNaN(Number(id))) {
+        if (!id || isNaN(Number(id))) {
           await msg.edit({ text: "请提供正确的消息 ID" });
           return;
         }
         const subCommandTxt = ` ${id} `;
-        const input = parts[4] ? msg.message.substring(msg.message.indexOf(subCommandTxt) + subCommandTxt.length) : '';
-        if(id) {
-          await handleMsgAddDel(msg, input, 'add', id);
+        const input = parts[4]
+          ? msg.message.substring(
+              msg.message.indexOf(subCommandTxt) + subCommandTxt.length
+            )
+          : "";
+        if (id) {
+          await handleMsgAddDel(msg, input, "add", id);
         }
         return;
       }

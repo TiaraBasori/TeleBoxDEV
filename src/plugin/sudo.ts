@@ -71,7 +71,7 @@ async function handleAddDel(
         return;
       }
       uid = Number(uid);
-      display = buildDisplay(uid, entity, !!entity?.userId);
+      display = buildDisplay(uid, entity, entity instanceof Api.User);
     } catch {
       await msg.edit({ text: "无法获取用户信息" });
       return;
@@ -141,7 +141,7 @@ async function handleChatAddDel(
         return;
       }
       cid = Number(cid);
-      display = buildDisplay(cid, entity, !!entity?.userId);
+      display = buildDisplay(cid, entity, entity instanceof Api.User);
     } catch {
       await msg.edit({ text: "无法获取对话信息" });
       return;
