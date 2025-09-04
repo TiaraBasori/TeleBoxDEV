@@ -1,13 +1,19 @@
 import path from "path";
 import fs from "fs";
-import { Plugin } from "@utils/pluginBase";
+import { isValidPlugin, Plugin } from "@utils/pluginBase";
 import { getGlobalClient } from "@utils/globalClient";
 import { NewMessageEvent, NewMessage } from "telegram/events";
 import { AliasDB } from "./aliasDB";
 import { Api, TelegramClient } from "telegram";
+import { cronManager } from "./cronManager";
 
-const basePlugins: Map<string, Plugin> = new Map(); // 用来储存唯一插件，不管他的重命名以及子命令
-const plugins: Map<string, Plugin> = new Map();
+type PluginEntry = {
+  original?: string; // 主要用于重定向命令找到初始命令，从而可以调用相应的命令函数，不是重定向的可以不填写
+  plugin: Plugin;
+};
+
+const validPlugins: Plugin[] = []; // 用来存储有效的插件，防止随意安装东西引起崩溃
+const plugins: Map<string, PluginEntry> = new Map();
 
 const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
 const DEFAUTL_PLUGIN_PATH = path.join(process.cwd(), "src", "plugin");
@@ -32,44 +38,45 @@ function dynamicRequireWithDeps(filePath: string) {
 
 async function setPlugins(basePath: string) {
   const files = fs.readdirSync(basePath).filter((file) => file.endsWith(".ts"));
+  const db = new AliasDB();
   for (const file of files) {
     const pluginPath = path.resolve(basePath, file);
     const mod = await dynamicRequireWithDeps(pluginPath);
-    if (mod) {
-      const plugin: Plugin = mod.default;
-      const commands = plugin.command;
-      // 只存第一个，这样才不会影响到监听函数的实行，不会多添加同一插件的多个监听函数
-      basePlugins.set(commands[0], plugin);
-      for (const command of commands) {
-      plugins.set(command, plugin);
-      // 设置 alias 命令回复
-      const db = new AliasDB();
-      const alias = db.get(command);
-      db.close();
-      if (alias) {
-        plugins.set(alias, plugin);
+    if (!mod) return;
+    const plugin = mod.default;
+    if (plugin instanceof Plugin && isValidPlugin(plugin)) {
+      validPlugins.push(plugin);
+      const cmds = Object.keys(plugin.cmdHandlers);
+      for (const cmd of cmds) {
+        plugins.set(cmd, { plugin });
+        const alias = db.get(cmd);
+        if (alias) {
+          plugins.set(alias, { original: alias, plugin });
+        }
       }
     }
   }
-  }
+  db.close();
 }
 
-function getPlugin(command: string): Plugin | undefined {
+function getPluginEntry(command: string): PluginEntry | undefined {
   return plugins.get(command);
 }
 
 function listCommands(): string[] {
-  const db = new AliasDB();
-  let cmds: string[] = Array.from(basePlugins.keys())
-    .sort((a, b) => a.localeCompare(b))
-    .map((item) => {
-      const anotherCMD = db.get(item);
-      return anotherCMD ? `${item}(${anotherCMD})` : item;
-    });
-  return cmds;
+  const cmds: Map<string, string> = new Map();
+  for (const key of plugins.keys()) {
+    const entry = plugins.get(key)!;
+    if (entry.original) {
+      cmds.set(key, `${entry.original}(${key})`);
+    } else {
+      cmds.set(key, key);
+    }
+  }
+  return Array.from(cmds.values()).sort((a, b) => a.localeCompare(b));
 }
 
-async function getCommandFromMessage(msg: Api.Message): Promise<string | null> {
+function getCommandFromMessage(msg: Api.Message): string | null {
   let prefixs = getPrefixs();
   const text = msg.message;
   if (!prefixs.some((p) => text.startsWith(p))) return null;
@@ -83,10 +90,15 @@ async function dealCommandPluginWithMessage(param: {
   msg: Api.Message;
 }) {
   const { cmd, msg } = param;
-  const plugin = getPlugin(cmd);
+  const pluginEntry = getPluginEntry(cmd);
   try {
-    if (plugin) {
-      await plugin.cmdHandler!(msg);
+    if (pluginEntry) {
+      const original = pluginEntry.original;
+      if (original) {
+        await pluginEntry.plugin.cmdHandlers[original](msg);
+      } else {
+        await pluginEntry.plugin.cmdHandlers[cmd](msg);
+      }
     } else {
       const availableCommands = listCommands();
       const helpText = `未知命令：${cmd}\n可用命令：${availableCommands.join(
@@ -105,7 +117,7 @@ async function dealCommandPlugin(event: NewMessageEvent) {
   // 检查是否发送到 收藏信息
   const savedMessage = (msg as any).savedPeerId;
   if (msg.out || savedMessage) {
-    const cmd = await getCommandFromMessage(msg);
+    const cmd = getCommandFromMessage(msg);
     if (cmd) {
       await dealCommandPluginWithMessage({ cmd, msg });
     }
@@ -113,8 +125,7 @@ async function dealCommandPlugin(event: NewMessageEvent) {
 }
 
 function dealListenMessagePlugin(client: TelegramClient): void {
-  // 多命令的插件，会额外添加监听事件
-  for (const plugin of basePlugins.values()) {
+  for (const plugin of validPlugins) {
     const messageHandler = plugin.listenMessageHandler;
     if (messageHandler) {
       client.addEventHandler(async (event: NewMessageEvent) => {
@@ -128,8 +139,23 @@ function dealListenMessagePlugin(client: TelegramClient): void {
   }
 }
 
+function dealCronPlugin(client: TelegramClient): void {
+  for (const plugin of validPlugins) {
+    const cronTasks = plugin.cronTasks;
+    if (cronTasks) {
+      const keys = Object.keys(cronTasks);
+      for (const key of keys) {
+        const cronTask = cronTasks[key];
+        cronManager.set(key, cronTask.cron, async () => {
+          await cronTask.handler(client)
+        })
+      }
+    }
+  }
+}
+
 async function clearPlugins() {
-  basePlugins.clear();
+  validPlugins.length = 0;
   plugins.clear();
 
   let client = await getGlobalClient();
@@ -142,6 +168,8 @@ async function clearPlugins() {
 async function loadPlugins() {
   // 清空现有插件
   await clearPlugins();
+  // 清空所有 cron 任务
+  cronManager.clear()
 
   // 设置插件路径
   await setPlugins(USER_PLUGIN_PATH);
@@ -152,13 +180,15 @@ async function loadPlugins() {
   client.addEventHandler(dealCommandPlugin, new NewMessage());
   // 添加监听新消息事件的处理器
   dealListenMessagePlugin(client);
+  // 添加cron事件
+  dealCronPlugin(client);
 }
 
 export {
   getPrefixs,
   loadPlugins,
   listCommands,
-  getPlugin,
+  getPluginEntry,
   dealCommandPluginWithMessage,
   getCommandFromMessage,
 };

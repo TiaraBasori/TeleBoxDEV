@@ -2,6 +2,7 @@ import { listCommands, getPlugin, getPrefixs } from "@utils/pluginManager";
 import { Plugin } from "@utils/pluginBase";
 import fs from "fs";
 import path from "path";
+import { Api } from "telegram";
 
 function readVersion(): string {
   try {
@@ -24,8 +25,8 @@ function formatCommandList(commands: string[]): string {
   
   sortedCommands.forEach(cmd => {
     const plugin = getPlugin(cmd);
-    if (plugin && Array.isArray(plugin.command) && plugin.command.length > 1) {
-      const mainCommand = plugin.command[0];
+    if (plugin && Array.isArray(plugin.cmdHandlers.keys) && plugin.cmdHandlers.keys.length > 1) {
+      const mainCommand = plugin.cmdHandlers[0];
       if (!pluginGroups.has(mainCommand)) {
         pluginGroups.set(mainCommand, plugin.command);
       }
@@ -70,10 +71,16 @@ function htmlEscape(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-const helpPlugin: Plugin = {
-  command: ["h", "help", "?"],
-  description: "查看帮助信息和可用命令列表",
-  cmdHandler: async (msg) => {
+
+class HelpPlugin extends Plugin {
+  description: string = "查看帮助信息和可用命令列表";
+  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
+    "help": this.handleHelp,
+    "h": this.handleHelp,
+    "帮助": this.handleHelp
+  };
+
+  private async handleHelp(msg: Api.Message): Promise<void> {
     try {
       const args = msg.text.split(' ').slice(1);
       
@@ -151,7 +158,9 @@ const helpPlugin: Plugin = {
         parseMode: "html"
       });
     }
-  },
-};
+  }
+}
+
+const helpPlugin = new HelpPlugin();
 
 export default helpPlugin;

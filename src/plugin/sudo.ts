@@ -105,13 +105,14 @@ const sudoPlugin: Plugin = {
     if (userId && users.includes(Number(userId))) {
       const cmd = await getCommandFromMessage(msg);
       if (!cmd) return;
-      const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
-        message: msg.message,
-        replyTo: msg.replyToMsgId,
-      });
-      if (sudoMsg) {
-        await dealCommandPluginWithMessage({ cmd: cmd, msg: sudoMsg });
-      }
+      await dealCommandPluginWithMessage({cmd, msg});
+      // const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
+      //   message: msg.message,
+      //   replyTo: msg.replyToMsgId,
+      // });
+      // if (sudoMsg) {
+      //   await dealCommandPluginWithMessage({ cmd: cmd, msg: sudoMsg });
+      // }
     }
   },
 };
