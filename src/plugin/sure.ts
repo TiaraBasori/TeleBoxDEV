@@ -326,10 +326,16 @@ const surePlugin: Plugin = {
     const msgs = getSureMsgs();
     const matchedMsg = msgs.find((m) => m.msg === msg.message);
     if (!matchedMsg) return;
-    await msg.client?.sendMessage(msg.peerId, {
-      message: matchedMsg.redirect || msg.message,
+
+    msg.message = matchedMsg.redirect || msg.message;
+    const cmd = await getCommandFromMessage(msg);
+
+    const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
+      message: msg.message,
       replyTo: msg.replyToMsgId,
     });
+    if (cmd && sudoMsg)
+      await dealCommandPluginWithMessage({ cmd, msg: sudoMsg });
   },
 };
 
