@@ -7,6 +7,11 @@ interface UserRecord {
   username: string;
 }
 
+interface ChatRecord {
+  id: number;
+  name: string;
+}
+
 class SudoDB {
   private db: Database.Database;
 
@@ -25,6 +30,18 @@ class SudoDB {
       CREATE TABLE IF NOT EXISTS users (
         uid INTEGER PRIMARY KEY,
         username TEXT NOT NULL
+      )
+    `
+      )
+      .run();
+
+    // 新增 chats 表
+    this.db
+      .prepare(
+        `
+      CREATE TABLE IF NOT EXISTS chats (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL
       )
     `
       )
@@ -71,6 +88,43 @@ class SudoDB {
       .all();
   }
 
+  // 添加或更新聊天
+  public addChat(id: number, name: string): void {
+    this.db
+      .prepare(
+        `
+        INSERT INTO chats (id, name)
+        VALUES (?, ?)
+        ON CONFLICT(id) DO UPDATE SET name = excluded.name
+      `
+      )
+      .run(id, name);
+  }
+
+  // 删除聊天
+  public delChat(id: number): boolean {
+    const info = this.db
+      .prepare(
+        `
+        DELETE FROM chats WHERE id = ?
+      `
+      )
+      .run(id);
+    return info.changes > 0;
+  }
+
+  // 列出所有聊天
+  public lsChats(): ChatRecord[] {
+    return this.db
+      .prepare<[], ChatRecord>(
+        `
+          SELECT id, name FROM chats
+          ORDER BY id ASC
+        `
+      )
+      .all();
+  }
+
   /**
    * 关闭数据库
    */
@@ -79,4 +133,4 @@ class SudoDB {
   }
 }
 
-export { SudoDB };
+export { SudoDB, UserRecord, ChatRecord };
