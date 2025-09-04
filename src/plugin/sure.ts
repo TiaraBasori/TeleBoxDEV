@@ -349,6 +349,10 @@ const surePlugin: Plugin = {
     });
     if (cmd && sudoMsg)
       await dealCommandPluginWithMessage({ cmd, msg: sudoMsg });
+    await sleep(2000);
+    try {
+      await msg.delete();
+    } catch (e) {}
   },
 };
 
