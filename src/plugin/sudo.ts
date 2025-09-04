@@ -49,28 +49,50 @@ function buildDisplay(uid: number, entity: any, isChannel: boolean) {
   return parts.join(" ").trim();
 }
 
-async function handleAddDel(msg: Api.Message, action: "add" | "del") {
-  if (!msg.isReply) {
-    await msg.edit({ text: "请回复一条消息以操作" });
-    return;
-  }
-  const reply = await msg.getReplyMessage();
-  if (!reply) {
-    await msg.edit({ text: "无法获取回复消息" });
-    return;
-  }
-  const uid = extractUid(reply.fromId as any);
-  if (!uid) {
-    await msg.edit({ text: "无法获取用户 ID" });
-    return;
-  }
+async function handleAddDel(
+  msg: Api.Message,
+  target: string,
+  action: "add" | "del"
+) {
   let entity: any;
-  try {
-    entity = await msg.client?.getEntity(uid);
-  } catch {
-    /* ignore */
+  let uid: any;
+  let display: any;
+  if (target) {
+    try {
+      entity = await msg.client?.getEntity(target);
+      uid = entity?.id;
+      if (!uid) {
+        await msg.edit({ text: "无法获取用户 ID" });
+        return;
+      }
+      uid = Number(uid);
+      display = buildDisplay(uid, entity, !!entity?.channelId);
+    } catch {
+      await msg.edit({ text: "无法获取用户信息" });
+      return;
+    }
+  } else {
+    if (!msg.isReply) {
+      await msg.edit({ text: "请回复目标用户的消息或带上 uid/@username" });
+      return;
+    }
+    const reply = await msg.getReplyMessage();
+    if (!reply) {
+      await msg.edit({ text: "无法获取回复消息" });
+      return;
+    }
+    uid = extractUid(reply.fromId as any);
+    if (!uid) {
+      await msg.edit({ text: "无法获取用户 ID" });
+      return;
+    }
+    try {
+      entity = await msg.client?.getEntity(uid);
+    } catch {
+      /* ignore */
+    }
+    display = buildDisplay(uid, entity, !!(reply.fromId as any)?.channelId);
   }
-  const display = buildDisplay(uid, entity, !!(reply.fromId as any)?.channelId);
 
   withSudoDB((db) => {
     if (action === "add") db.add(uid, display);
@@ -100,12 +122,13 @@ async function handleList(msg: Api.Message) {
 
 const sudoPlugin: Plugin = {
   command: ["sudo"],
-  description: `赋予其他用户使用 bot 权限\n.sudo add (回复用户消息) - 添加用户\n.sudo del (回复用户消息) - 删除用户\n.sudo ls - 列出所有用户`,
+  description: `赋予其他用户使用 bot 权限\n.sudo add (回复目标用户的消息或带上 uid/@username) - 添加用户\n.sudo del (回复目标用户的消息或带上 uid/@username) - 删除用户\n.sudo ls - 列出所有用户`,
   cmdHandler: async (msg) => {
-    const parts = msg.message.trim().split(/\s+/); // 如: .sudo add
+    const parts = msg.message.trim().split(/\s+/);
     const command = parts[1];
+    const target = parts[2];
     if (command === "add" || command === "del") {
-      await handleAddDel(msg, command);
+      await handleAddDel(msg, target, command);
       return;
     }
     if (command === "ls" || command === "list") {
