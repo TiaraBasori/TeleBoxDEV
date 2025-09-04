@@ -40,7 +40,7 @@ function extractId(from: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function buildDisplay(uid: number, entity: any, isUser: boolean) {
+function buildDisplay(id: number, entity: any, isUser: boolean) {
   const parts: string[] = [];
   if (entity?.title) parts.push(entity.title);
   if (entity?.firstName) parts.push(entity.firstName);
@@ -48,8 +48,8 @@ function buildDisplay(uid: number, entity: any, isUser: boolean) {
   if (entity?.username) parts.push(`@${entity.username}`);
   parts.push(
     isUser
-      ? `<a href="tg://user?id=${uid}">${uid}</a>`
-      : `<a href="https://t.me/c/${uid}">${uid}</a>`
+      ? `<a href="tg://user?id=${id}">${id}</a>`
+      : `<a href="https://t.me/c/${id}">${id}</a>`
   );
   return parts.join(" ").trim();
 }
