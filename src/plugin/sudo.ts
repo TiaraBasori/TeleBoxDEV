@@ -7,112 +7,124 @@ import {
   getCommandFromMessage,
 } from "@utils/pluginManager";
 
-async function handleAdd(msg: Api.Message) {
-  if (!msg.isReply) {
-    await msg.edit({ text: "请回复一条消息以添加用户。" });
-    return;
-  }
-  const fromId = (await msg.getReplyMessage())?.fromId;
-  const user = await msg.client?.getEntity(fromId as any);
-  if (user instanceof Api.User) {
-    const sudoDB = new SudoDB();
-    sudoDB.add(
-      Number(user.id),
-      user.username || user.firstName || user.lastName || "Unknown"
-    );
-    sudoDB.close();
-    await msg.edit({
-      text: `已添加用户：${user.username || "Unknown"} (ID: ${user.id})`,
-    });
-    await sleep(2000);
-    await msg.delete();
-  } else {
-    await msg.edit({ text: "无法获取用户信息。" });
+// 简单缓存 sudo 用户 ID，减少频繁 IO
+let sudoCache = { ids: [] as number[], ts: 0 };
+const SUDO_CACHE_TTL = 10_000; // 10s
+
+function withSudoDB<T>(fn: (db: SudoDB) => T): T {
+  const db = new SudoDB();
+  try {
+    return fn(db);
+  } finally {
+    db.close();
   }
 }
+function refreshSudoCache() {
+  sudoCache.ids = withSudoDB((db) => db.ls().map((u) => u.uid));
+  sudoCache.ts = Date.now();
+}
+function getSudoIds() {
+  if (Date.now() - sudoCache.ts > SUDO_CACHE_TTL) refreshSudoCache();
+  return sudoCache.ids;
+}
 
-async function handleDel(msg: Api.Message) {
+function extractUid(from: any): number | null {
+  const raw = from?.channelId || from?.userId;
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildDisplay(uid: number, entity: any, isChannel: boolean) {
+  const parts: string[] = [];
+  if (entity?.title) parts.push(entity.title);
+  if (entity?.firstName) parts.push(entity.firstName);
+  if (entity?.lastName) parts.push(entity.lastName);
+  if (entity?.username) parts.push(`@${entity.username}`);
+  parts.push(
+    isChannel
+      ? `<a href="https://t.me/c/${uid}">${uid}</a>`
+      : `<a href="tg://user?id=${uid}">${uid}</a>`
+  );
+  return parts.join(" ").trim();
+}
+
+async function handleAddDel(msg: Api.Message, action: "add" | "del") {
   if (!msg.isReply) {
-    await msg.edit({ text: "请回复一条消息以删除用户。" });
+    await msg.edit({ text: "请回复一条消息以操作" });
     return;
   }
-  const fromId = (await msg.getReplyMessage())?.fromId;
-  const user = await msg.client?.getEntity(fromId as any);
-  if (user instanceof Api.User) {
-    const sudoDB = new SudoDB();
-    const success = sudoDB.del(Number(user.id));
-    sudoDB.close();
-    if (success) {
-      await msg.edit({
-        text: `已删除用户：${
-          user.username || user.firstName || user.lastName
-        } (ID: ${user.id})`,
-      });
-      await sleep(2000); // 等待1秒
-      await msg.delete();
-    } else {
-      await msg.edit({ text: "用户不存在或删除失败。" });
-    }
-  } else {
-    await msg.edit({ text: "无法获取用户信息。" });
+  const reply = await msg.getReplyMessage();
+  if (!reply) {
+    await msg.edit({ text: "无法获取回复消息" });
+    return;
   }
+  const uid = extractUid(reply.fromId as any);
+  if (!uid) {
+    await msg.edit({ text: "无法获取用户 ID" });
+    return;
+  }
+  let entity: any;
+  try {
+    entity = await msg.client?.getEntity(uid);
+  } catch {
+    /* ignore */
+  }
+  const display = buildDisplay(uid, entity, !!(reply.fromId as any)?.channelId);
+
+  withSudoDB((db) => {
+    if (action === "add") db.add(uid, display);
+    else db.del(uid);
+  });
+  sudoCache.ts = 0; // 失效缓存
+
+  await msg.edit({
+    text: `已${action === "add" ? "添加" : "删除"}: ${display}`,
+    parseMode: "html",
+  });
+  await sleep(2000);
+  await msg.delete();
 }
 
 async function handleList(msg: Api.Message) {
-  const sudoDB = new SudoDB();
-  const users = sudoDB.ls();
-  sudoDB.close();
+  const users = withSudoDB((db) => db.ls());
   if (users.length === 0) {
-    await msg.edit({ text: "当前没有任何用户。" });
+    await msg.edit({ text: "当前没有任何用户" });
     return;
   }
-  const userList = users
-    .map((user) => `- <a href="tg://user?id=${user.uid}">${user.username}</a>`)
-    .join("\n");
-  await msg.edit({ text: `当前用户列表：\n${userList}`, parseMode: "html" });
+  await msg.edit({
+    text: `当前用户列表：\n${users.map((u) => "- " + u.username).join("\n")}`,
+    parseMode: "html",
+  });
 }
 
-/**
- * sudo 插件
- */
 const sudoPlugin: Plugin = {
   command: ["sudo"],
-  description:
-    `赋予其他用户使用 bot 权限\n` +
-    `.sudo add (回复用户消息) - 添加用户\n` +
-    `.sudo del (回复用户消息) - 删除用户\n` +
-    `.sudo ls - 列出所有用户`,
+  description: `赋予其他用户使用 bot 权限\n.sudo add (回复用户消息) - 添加用户\n.sudo del (回复用户消息) - 删除用户\n.sudo ls - 列出所有用户`,
   cmdHandler: async (msg) => {
-    const [, ...args] = msg.message.slice(1).split(" ");
-    const command = args[0];
-    if (command == "add") {
-      await handleAdd(msg);
-    } else if (command == "del") {
-      await handleDel(msg);
-    } else if (command == "ls" || command == "list") {
-      await handleList(msg);
-    } else {
-      await msg.edit({ text: "未知命令，请使用 add、del 或 ls。" });
+    const parts = msg.message.trim().split(/\s+/); // 如: .sudo add
+    const command = parts[1];
+    if (command === "add" || command === "del") {
+      await handleAddDel(msg, command);
+      return;
     }
+    if (command === "ls" || command === "list") {
+      await handleList(msg);
+      return;
+    }
+    await msg.edit({ text: "未知命令，请使用 add、del 或 ls" });
   },
   listenMessageHandler: async (msg) => {
-    const sudoDB = new SudoDB();
-    const users = sudoDB.ls().map((user) => user.uid);
-    sudoDB.close();
-    const fromId = msg.fromId;
-    if (!(fromId instanceof Api.PeerUser)) return;
-    const userId = fromId.userId;
-    if (userId && users.includes(Number(userId))) {
-      const cmd = await getCommandFromMessage(msg);
-      if (!cmd) return;
-      const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
-        message: msg.message,
-        replyTo: msg.replyToMsgId,
-      });
-      if (sudoMsg) {
-        await dealCommandPluginWithMessage({ cmd: cmd, msg: sudoMsg });
-      }
-    }
+    const uid = extractUid(msg.fromId as any);
+    if (!uid) return;
+    if (!getSudoIds().includes(uid)) return;
+    const cmd = await getCommandFromMessage(msg);
+    if (!cmd) return;
+    const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
+      message: msg.message,
+      replyTo: msg.replyToMsgId,
+    });
+    if (sudoMsg) await dealCommandPluginWithMessage({ cmd, msg: sudoMsg });
   },
 };
 
