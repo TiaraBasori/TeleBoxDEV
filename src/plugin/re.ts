@@ -29,9 +29,29 @@ class RePlugin extends Plugin {
         await msg.delete();
         for (let i = 0; i < repeat; i++) {
           if (messages && messages.length > 0) {
-            for (const message of messages) {
-              await message.forwardTo(msg.peerId);
-            }
+            // for (const message of messages) {
+            //   await message.forwardTo(msg.peerId);
+            // }
+            // await msg.client?.forwardMessages(msg.peerId, {
+            //   messages: messages.map((m) => m.id),
+            //   fromPeer: msg.peerId,
+            // });
+            // 使用原始 API 以支持论坛话题 (topMsgId)
+            const toPeer = await msg.getInputChat();
+            const fromPeer = await replied!.getInputChat();
+            const ids = messages.map((m) => m.id);
+            const topMsgId =
+              msg.replyTo?.replyToTopId || replied?.replyTo?.replyToTopId;
+
+            await msg.client?.invoke(
+              new Api.messages.ForwardMessages({
+                fromPeer,
+                id: ids,
+                toPeer,
+                // 如果在论坛话题中，指定话题的顶层消息 ID
+                ...(topMsgId ? { topMsgId } : {}),
+              })
+            );
           }
         }
       } catch (error) {

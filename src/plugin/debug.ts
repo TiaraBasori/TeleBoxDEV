@@ -1,9 +1,14 @@
 import { Plugin } from "@utils/pluginBase";
 import { getGlobalClient } from "@utils/globalClient";
 import { Api, TelegramClient } from "telegram";
-
-class IdPlugin extends Plugin {
-  description: string = `获取详细的用户、群组或频道信息`;
+import { getPrefixes } from "@utils/pluginManager";
+const prefixes = getPrefixes();
+const mainPrefix = prefixes[0];
+class DebugPlugin extends Plugin {
+  description: string = `<code>${mainPrefix}id 回复一条消息 或 留空查看当前对话</code> - 获取详细的用户、群组或频道信息
+<code>${mainPrefix}.entity [id/@name] 或 回复一条消息 或 留空查看当前对话</code> - 获取 entity 信息
+<code>${mainPrefix}.msg 回复一条消息</code> - 获取 msg 信息
+`;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     id: async (msg) => {
       const client = await getGlobalClient();
@@ -46,6 +51,42 @@ class IdPlugin extends Plugin {
           text: `获取信息时出错: ${error.message}`,
         });
       }
+    },
+
+    entity: async (msg) => {
+      const [cmd, ...args] = msg.message.trim().split(/\s+/);
+      const input = args.join("");
+      const reply = await msg.getReplyMessage();
+      const entity = await msg.client?.getEntity(
+        input || reply?.senderId || msg.peerId
+      );
+      console.log(entity);
+      msg.edit({
+        text: `<blockquote expandable>${JSON.stringify(
+          entity,
+          null,
+          2
+        )}</blockquote>`,
+        parseMode: "html",
+      });
+    },
+    msg: async (msg) => {
+      const reply = await msg.getReplyMessage();
+      if (!reply) {
+        await msg.edit({
+          text: `请回复一条消息以获取详细信息。`,
+        });
+        return;
+      }
+      console.log(reply);
+      msg.edit({
+        text: `<blockquote expandable>${JSON.stringify(
+          reply,
+          null,
+          2
+        )}</blockquote>`,
+        parseMode: "html",
+      });
     },
   };
 }
@@ -172,4 +213,4 @@ async function formatChatInfo(
   }
 }
 
-export default new IdPlugin();
+export default new DebugPlugin();
