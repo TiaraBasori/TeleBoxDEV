@@ -1,66 +1,91 @@
 # Changelog
 
 ## [0.1.4] --2025-09-05
+
 ## Added
+
 - 新的插件结构，完善子命令函数的结构，增加 cron 任务的统一管理，目前可以参考 [test](https://github.com/TeleBoxDev/TeleBox/blob/dev/src/plugin/test.ts)
 - 很多插件目前没有符合新插件要求，静等开发
 
 ## [0.1.3] --2025-09-01
+
 ## Fixed
+
 - pluginManager 修复对含有子命令的插件添加太多监听函数
 
 ## [0.1.2] --2025-08-31
+
 ## Fixed
+
 - help 可查看所有指令前缀
 - update 若失败会提示用 .update -f 来强制更新
 
 ## [0.1.1] --2025-08-26
+
 ## Added
+
 - help 可查看当前版本
 - 添加 id 插件
-- .npm search 可查看远程插件列表
+- .tpm search 可查看远程插件列表
 
 ## [0.1.0] --2025-08-25
+
 ## Added
+
 - Plugin @property command 改成 string[]，满足一些多命令的插件，需要调整以前的插件结构
 
 ## [0.0.9] --2025-08-23
+
 ## Added
+
 - alias set|del 相关命令后重启插件从而能无缝使用新命令来唤出插件
 - alias del 会判断正确的删除提示，而不是每次都返回成功
 - 增加对插件监听函数的捕捉错误，防止掉线
 
 ## [0.0.8] --2025-08-23
+
 ## Fixed
+
 - 修复 sudo 监听事件偶尔监听不到消息来源会崩溃的问题
 
 ## [0.0.7] --2025-08-23
+
 ## Added
+
 - 新增 sudo 用来分配权限给其他用户
 - 新增 exec 用来运行 shell
 - 新增 Plugin 监听函数，用来实现如 keyword 以及 sudo 等插件的主要监听部分
 - Plugin 调整结构，处理命令行函数不再传入 NewMessageEvent，而是传入 Api.Message，需要调整下插件
 
 ## [0.0.6] -- 2025-08-15
+
 ## Added
+
 - 新增 alias 重定向插件命令
 - 新增 用 。 符号识别插件
 
 ## [0.0.5] -- 2025-08-15
+
 ## Added
+
 - 新增 上传插件 .npm upload <Plugin>
 - 新增 封装 converstation 用来与 bot 持续对话
 - 添加 ytdl 依赖
 
 ## [0.0.4] -- 2025-08-14
+
 ### Fixed
+
 - 修复无法强制更新问题
 
 ## [0.0.3] -- 2025-08-13
+
 ### Added
+
 - 新增 npm_install，简单封装安装依赖功能，统一外部插件安装依赖方法
 - 新增 远程安装插件以及删除插件功能
 
 ### Fixed
+
 - 修复装相同插件缓存问题
 - 完善 help 插件

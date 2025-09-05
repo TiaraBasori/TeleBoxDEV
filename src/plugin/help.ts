@@ -107,7 +107,7 @@ class HelpPlugin extends Plugin {
           `❕ <b>指令前缀：</b> ${prefiexs
             .map((p) => `<code>${htmlEscape(p)}</code>`)
             .join(" • ")}`,
-          `💡 <code>${prefiexs[0]}help [命令]</code> 查看详情 | <code>${prefiexs[0]}npm search</code> 显示远程插件列表`,
+          `💡 <code>${prefiexs[0]}help [命令]</code> 查看详情 | <code>${prefiexs[0]}tpm search</code> 显示远程插件列表`,
           "🔗 <a href='https://github.com/TeleBoxDev/TeleBox'>📦仓库</a> | <a href='https://github.com/TeleBoxDev/TeleBox_Plugins'>🔌插件</a>",
         ].join("\n");
 
