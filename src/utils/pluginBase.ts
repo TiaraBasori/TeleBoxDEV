@@ -2,11 +2,15 @@ import { Api, TelegramClient } from "telegram";
 
 type CronTask = {
   cron: string;
+  description: string;
   handler: (client: TelegramClient) => Promise<void>;
 };
 
 abstract class Plugin {
-  abstract description: string | (() => string) | (() => Promise<string>);
+  abstract description:
+    | string
+    | ((...args: any[]) => string | void)
+    | ((...args: any[]) => Promise<string | void>);
   abstract cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>>;
   listenMessageHandler?: (msg: Api.Message) => Promise<void>;
   cronTasks?: Record<string, CronTask>;

@@ -76,9 +76,9 @@ function listCommands(): string[] {
   return Array.from(cmds.values()).sort((a, b) => a.localeCompare(b));
 }
 
-function getCommandFromMessage(msg: Api.Message): string | null {
+function getCommandFromMessage(msg: Api.Message | string): string | null {
   let prefixs = getPrefixs();
-  const text = msg.message;
+  const text = typeof msg === "string" ? msg : msg.message;
   if (!prefixs.some((p) => text.startsWith(p))) return null;
   const [cmd] = text.slice(1).split(" ");
   if (!cmd) return null;
@@ -147,8 +147,8 @@ function dealCronPlugin(client: TelegramClient): void {
       for (const key of keys) {
         const cronTask = cronTasks[key];
         cronManager.set(key, cronTask.cron, async () => {
-          await cronTask.handler(client)
-        })
+          await cronTask.handler(client);
+        });
       }
     }
   }
@@ -169,7 +169,7 @@ async function loadPlugins() {
   // 清空现有插件
   await clearPlugins();
   // 清空所有 cron 任务
-  cronManager.clear()
+  cronManager.clear();
 
   // 设置插件路径
   await setPlugins(USER_PLUGIN_PATH);

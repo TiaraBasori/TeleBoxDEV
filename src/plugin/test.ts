@@ -12,15 +12,20 @@ class TestPlugin extends Plugin {
   cronTasks?:
     | Record<
         string,
-        { cron: string; handler: (client: TelegramClient) => Promise<void> }
+        {
+          cron: string;
+          description: string;
+          handler: (client: TelegramClient) => Promise<void>;
+        }
       >
     | undefined = {
     kkk: {
+      description: "每 5 秒执行一次",
       cron: "*/5 * * * * *",
       handler: async (client) => {
-        await client.sendMessage("me", {
-          message: "cron 任务开始， 每5s发一次",
-        });
+        // await client.sendMessage("me", {
+        //   message: "cron 任务开始， 每5s发一次",
+        // });
       },
     },
   };

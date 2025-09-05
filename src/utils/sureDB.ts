@@ -12,11 +12,18 @@ interface ChatRecord {
   name: string;
 }
 
-class SudoDB {
+// 新增消息记录接口
+interface MsgRecord {
+  id: number;
+  msg: string;
+  redirect?: string;
+}
+
+class SureDB {
   private db: Database.Database;
 
   constructor(
-    dbPath: string = path.join(createDirectoryInAssets("sudo"), "sudo.db")
+    dbPath: string = path.join(createDirectoryInAssets("sure"), "sure.db")
   ) {
     this.db = new Database(dbPath);
     this.init();
@@ -42,6 +49,19 @@ class SudoDB {
       CREATE TABLE IF NOT EXISTS chats (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL
+      )
+    `
+      )
+      .run();
+
+    // 新增 msgs 表，支持自增 id
+    this.db
+      .prepare(
+        `
+      CREATE TABLE IF NOT EXISTS msgs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        msg TEXT NOT NULL UNIQUE,
+        redirect TEXT
       )
     `
       )
@@ -125,6 +145,42 @@ class SudoDB {
       .all();
   }
 
+  // 新增：添加消息
+  public addMsg(msg: string, redirectMsg?: string): void {
+    this.db
+      .prepare(
+        `
+        INSERT INTO msgs (msg, redirect)
+        VALUES (?, ?)
+        ON CONFLICT(msg) DO UPDATE SET redirect = excluded.redirect
+      `
+      )
+      .run(msg, redirectMsg);
+  }
+
+  // 删除消息
+  public delMsg(id: number): boolean {
+    const info = this.db
+      .prepare(
+        `
+        DELETE FROM msgs WHERE id = ?
+      `
+      )
+      .run(id);
+    return info.changes > 0;
+  }
+
+  // 列出所有消息
+  public lsMsgs(): MsgRecord[] {
+    return this.db
+      .prepare<[], MsgRecord>(
+        `
+        SELECT id, msg, redirect FROM msgs ORDER BY id ASC
+      `
+      )
+      .all();
+  }
+
   /**
    * 关闭数据库
    */
@@ -133,4 +189,4 @@ class SudoDB {
   }
 }
 
-export { SudoDB, UserRecord, ChatRecord };
+export { SureDB, UserRecord, ChatRecord, MsgRecord };

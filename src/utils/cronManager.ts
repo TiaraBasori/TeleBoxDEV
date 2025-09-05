@@ -4,6 +4,7 @@ type CronHandler = () => void | Promise<void>;
 
 interface CronTask {
   cron: string;
+  description: string;
   job: CronJob;
 }
 

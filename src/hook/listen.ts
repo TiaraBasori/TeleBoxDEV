@@ -18,7 +18,7 @@ async function patchMsgEdit(): Promise<void> {
   Api.Message.prototype.edit = async function (
     params: Omit<EditMessageParams, "message">
   ): Promise<Api.Message | undefined> {
-    console.log(this.senderId);
+    // console.log(this.senderId);
     const senderId = Number(this.senderId);
     const isSudoUser = checkIfSenderIdFromSudoUser(this, Number(this.senderId));
     const me = await this.client!.getMe();
@@ -27,7 +27,7 @@ async function patchMsgEdit(): Promise<void> {
     if (isSudoUser) {
       //   return await this.client?.sendMessage(this.peerId, { message: "kkkk" });
       // return await this.edit({text: "sss"});
-      params.text = "希望 hook 成功";
+      // params.text = "希望 hook 成功";
       return await this.client?.sendMessage(this.peerId, {
         message: params.text,
         ...params,
