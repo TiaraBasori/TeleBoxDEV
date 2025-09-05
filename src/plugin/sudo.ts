@@ -227,12 +227,13 @@ class sudoPlugin extends Plugin {
       if (cids.length > 0 && !cids.includes(cid)) return;
       const cmd = await getCommandFromMessage(msg);
       if (!cmd) return;
-      await dealCommandPluginWithMessage({ cmd, msg });
-      // // const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
-      // //   message: msg.message,
-      // //   replyTo: msg.replyToMsgId,
-      // // });
-      // // if (sudoMsg) await dealCommandPluginWithMessage({ cmd, msg: sudoMsg });
+      // await dealCommandPluginWithMessage({ cmd, msg });
+      const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
+        message: msg.message,
+        replyTo: msg.replyToMsgId,
+      });
+      if (sudoMsg)
+        await dealCommandPluginWithMessage({ cmd, msg: sudoMsg, trigger: msg });
     };
 }
 const plugin = new sudoPlugin();

@@ -346,20 +346,20 @@ class surePlugin extends Plugin {
       const message = replacedMsg || matchedMsg.redirect || msg.message;
       const cmd = await getCommandFromMessage(message);
 
-      // const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
-      //   message,
-      //   replyTo: msg.replyToMsgId,
-      // });
-      // if (cmd && sudoMsg)
-      //   await dealCommandPluginWithMessage({ cmd, msg: sudoMsg });
-      if (cmd) {
-        await dealCommandPluginWithMessage({ cmd, msg });
-      } else {
-        await msg.client?.sendMessage(msg.peerId, {
-          message,
-          replyTo: msg.replyToMsgId,
-        });
-      }
+      const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
+        message,
+        replyTo: msg.replyToMsgId,
+      });
+      if (cmd && sudoMsg)
+        await dealCommandPluginWithMessage({ cmd, msg: sudoMsg, trigger: msg });
+      // if (cmd) {
+      //   await dealCommandPluginWithMessage({ cmd, msg });
+      // } else {
+      //   await msg.client?.sendMessage(msg.peerId, {
+      //     message,
+      //     replyTo: msg.replyToMsgId,
+      //   });
+      // }
       await sleep(2000);
       try {
         await msg.delete();

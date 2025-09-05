@@ -2,7 +2,7 @@ import { login } from "@utils/loginManager";
 import { loadPlugins } from "@utils/pluginManager";
 import { patchMsgEdit } from "hook/listen";
 
-patchMsgEdit();
+// patchMsgEdit();
 
 async function run() {
   await login();

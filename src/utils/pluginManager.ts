@@ -88,16 +88,17 @@ function getCommandFromMessage(msg: Api.Message | string): string | null {
 async function dealCommandPluginWithMessage(param: {
   cmd: string;
   msg: Api.Message;
+  trigger?: Api.Message;
 }) {
-  const { cmd, msg } = param;
+  const { cmd, msg, trigger } = param;
   const pluginEntry = getPluginEntry(cmd);
   try {
     if (pluginEntry) {
       const original = pluginEntry.original;
       if (original) {
-        await pluginEntry.plugin.cmdHandlers[original](msg);
+        await pluginEntry.plugin.cmdHandlers[original](msg, trigger);
       } else {
-        await pluginEntry.plugin.cmdHandlers[cmd](msg);
+        await pluginEntry.plugin.cmdHandlers[cmd](msg, trigger);
       }
     } else {
       const availableCommands = listCommands();

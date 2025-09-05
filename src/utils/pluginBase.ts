@@ -11,7 +11,10 @@ abstract class Plugin {
     | string
     | ((...args: any[]) => string | void)
     | ((...args: any[]) => Promise<string | void>);
-  abstract cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>>;
+  abstract cmdHandlers: Record<
+    string,
+    (msg: Api.Message, trigger?: Api.Message) => Promise<void>
+  >;
   listenMessageHandler?: (msg: Api.Message) => Promise<void>;
   cronTasks?: Record<string, CronTask>;
 }
