@@ -111,7 +111,11 @@ class HelpPlugin extends Plugin {
           "🔗 <a href='https://github.com/TeleBoxDev/TeleBox'>📦仓库</a> | <a href='https://github.com/TeleBoxDev/TeleBox_Plugins'>🔌插件</a>",
         ].join("\n");
 
-        await msg.edit({ text: helpText, parseMode: "html" });
+        await msg.edit({
+          text: helpText,
+          parseMode: "html",
+          linkPreview: false,
+        });
         return;
       }
 
@@ -182,7 +186,11 @@ class HelpPlugin extends Plugin {
         "💡 <i>提示: 使用</i> <code>.help</code> <i>查看所有命令</i>",
       ].join("\n");
 
-      await msg.edit({ text: commandHelpText, parseMode: "html" });
+      await msg.edit({
+        text: commandHelpText,
+        parseMode: "html",
+        linkPreview: false,
+      });
     } catch (error: any) {
       console.error("Help plugin error:", error);
       const errorMsg =
