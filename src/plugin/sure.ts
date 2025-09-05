@@ -247,113 +247,125 @@ async function handleMsgList(msg: Api.Message) {
   });
 }
 
-const surePlugin: Plugin = {
-  command: ["sure"],
-  description: `赋予其他用户使用 bot 身份发送消息(支持重定向)的权限\n.sure add (回复目标用户的消息或带上 uid/@username) - 添加用户\n.sure del (回复目标用户的消息或带上 uid/@username) - 删除用户\n.sure ls - 列出所有用户\n\n⚠️ 若未设置对话白名单, 所有对话中均可使用\n.sure chat add (在当前对话中使用 或带上 id/@name) - 添加对话到白名单\n.sure chat del (在当前对话中使用 或带上 id/@name) - 从白名单删除对话\n.sure chat ls/list - 列出对话白名单\n\n⚠️ 需设置消息白名单方可使用\n.sure msg add 消息(使用原始字符串, 即可包含空格) - 添加消息白名单\n⚠️ 若以 _command: 开头, 认为此消息是命令, 即 _command:/sb 可匹配 /sb 和 /sb uid. 若设置了重定向为 /spam, 则会自动变成 /spam 和 /spam uid\n.sure msg redirect ID 重定向消息(使用原始字符串, 即可包含空格) - 使用消息的 ID 为消息设置重定向(设置空即为清除重定向)\n.sure msg del ID - 使用消息的 ID 从白名单删除消息\n.sure msg ls/list - 列出消息白名单`,
-  cmdHandler: async (msg) => {
-    const parts = msg.message.trim().split(/\s+/);
-    let command = parts[1];
-    if (command === "chat") {
-      let subCommand = parts[2];
-      if (subCommand === "add" || subCommand === "del") {
-        await handleChatAddDel(msg, parts[3], subCommand);
-        return;
-      }
-      if (subCommand === "ls" || subCommand === "list") {
-        await handleChatList(msg);
-        return;
-      }
-    }
-    if (command === "msg") {
-      let subCommand = parts[2];
-      if ((subCommand === "add" || subCommand === "del") && parts[3]) {
-        if (subCommand === "del" && (!parts[3] || isNaN(Number(parts[3])))) {
-          await msg.edit({ text: "请提供正确的消息 ID" });
+class surePlugin extends Plugin {
+  description: string = `赋予其他用户使用 bot 身份发送消息(支持重定向)的权限\n<code>.sure add (回复目标用户的消息或带上 uid/@username)</code> - 添加用户\n<code>.sure del (回复目标用户的消息或带上 uid/@username)</code> - 删除用户\n<code>.sure ls</code> - 列出所有用户\n\n⚠️ 若未设置对话白名单, 所有对话中均可使用\n<code>.sure chat add (在当前对话中使用 或带上 id/@name)</code> - 添加对话到白名单\n<code>.sure chat del (在当前对话中使用 或带上 id/@name)</code> - 从白名单删除对话\n<code>.sure chat ls/list</code> - 列出对话白名单\n\n⚠️ 需设置消息白名单方可使用\n<code>.sure msg add 消息(使用原始字符串, 即可包含空格)</code> - 添加消息白名单\n⚠️ 若以 _command: 开头, 认为此消息是命令, 即 _command:/sb 可匹配 /sb 和 /sb uid. 若设置了重定向为 /spam, 则会自动变成 /spam 和 /spam uid\n<code>.sure msg redirect ID 重定向消息(使用原始字符串, 即可包含空格)</code> - 使用消息的 ID 为消息设置重定向(设置空即为清除重定向)\n<code>.sure msg del ID</code> - 使用消息的 ID 从白名单删除消息\n<code>.sure msg ls/list</code> - 列出消息白名单`;
+  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
+    sure: async (msg) => {
+      const parts = msg.message.trim().split(/\s+/);
+      let command = parts[1];
+      if (command === "chat") {
+        let subCommand = parts[2];
+        if (subCommand === "add" || subCommand === "del") {
+          await handleChatAddDel(msg, parts[3], subCommand);
           return;
         }
-        const subCommandTxt = ` ${subCommand} `;
-        const input = msg.message.substring(
-          msg.message.indexOf(subCommandTxt) + subCommandTxt.length
-        );
-        if (input) {
-          await handleMsgAddDel(msg, input, subCommand);
-        }
-        return;
-      }
-      if (subCommand === "redirect") {
-        const id = parts[3];
-        if (!id || isNaN(Number(id))) {
-          await msg.edit({ text: "请提供正确的消息 ID" });
+        if (subCommand === "ls" || subCommand === "list") {
+          await handleChatList(msg);
           return;
         }
-        const subCommandTxt = ` ${id} `;
-        const input = parts[4]
-          ? msg.message.substring(
-              msg.message.indexOf(subCommandTxt) + subCommandTxt.length
-            )
-          : "";
-        if (id) {
-          await handleMsgAddDel(msg, input, "add", id);
+      }
+      if (command === "msg") {
+        let subCommand = parts[2];
+        if ((subCommand === "add" || subCommand === "del") && parts[3]) {
+          if (subCommand === "del" && (!parts[3] || isNaN(Number(parts[3])))) {
+            await msg.edit({ text: "请提供正确的消息 ID" });
+            return;
+          }
+          const subCommandTxt = ` ${subCommand} `;
+          const input = msg.message.substring(
+            msg.message.indexOf(subCommandTxt) + subCommandTxt.length
+          );
+          if (input) {
+            await handleMsgAddDel(msg, input, subCommand);
+          }
+          return;
         }
+        if (subCommand === "redirect") {
+          const id = parts[3];
+          if (!id || isNaN(Number(id))) {
+            await msg.edit({ text: "请提供正确的消息 ID" });
+            return;
+          }
+          const subCommandTxt = ` ${id} `;
+          const input = parts[4]
+            ? msg.message.substring(
+                msg.message.indexOf(subCommandTxt) + subCommandTxt.length
+              )
+            : "";
+          if (id) {
+            await handleMsgAddDel(msg, input, "add", id);
+          }
+          return;
+        }
+        if (subCommand === "ls" || subCommand === "list") {
+          await handleMsgList(msg);
+          return;
+        }
+      }
+      let target = parts[2];
+      if (command === "add" || command === "del") {
+        await handleAddDel(msg, target, command);
         return;
       }
-      if (subCommand === "ls" || subCommand === "list") {
-        await handleMsgList(msg);
+      if (command === "ls" || command === "list") {
+        await handleList(msg);
         return;
       }
-    }
-    let target = parts[2];
-    if (command === "add" || command === "del") {
-      await handleAddDel(msg, target, command);
-      return;
-    }
-    if (command === "ls" || command === "list") {
-      await handleList(msg);
-      return;
-    }
-    await msg.edit({
-      text: "未知命令, 请使用 <code>.help sure</code> 查看帮助",
-      parseMode: "html",
-    });
-  },
-  listenMessageHandler: async (msg) => {
-    const uid = extractId(msg.fromId as any);
-    const cid = extractId(msg.peerId as any);
-    if (!uid || !cid) return;
-    if (!getSureIds().includes(uid)) return;
-    const cids = getSureCids();
-    if (cids.length > 0 && !cids.includes(cid)) return;
-    const msgs = getSureMsgs();
-    let replacedMsg = null;
-    const matchedMsg = msgs.find((m) => {
-      if (m.msg.startsWith("_command:")) {
-        const prefix = m.msg.replace("_command:", "");
-        const isStartsWith = msg.message.startsWith(prefix);
-        const suffix = msg.message.replace(prefix, "");
-        const matched = isStartsWith && (!suffix || suffix.startsWith(" "));
-        if (matched && m.redirect) {
-          replacedMsg = msg.message.replace(prefix, m.redirect);
+      await msg.edit({
+        text: "未知命令, 请使用 <code>.help sure</code> 查看帮助",
+        parseMode: "html",
+      });
+    },
+  };
+
+  listenMessageHandler?: ((msg: Api.Message) => Promise<void>) | undefined =
+    async (msg) => {
+      const uid = extractId(msg.fromId as any);
+      const cid = extractId(msg.peerId as any);
+      if (!uid || !cid) return;
+      if (!getSureIds().includes(uid)) return;
+      const cids = getSureCids();
+      if (cids.length > 0 && !cids.includes(cid)) return;
+      const msgs = getSureMsgs();
+      let replacedMsg = null;
+      const matchedMsg = msgs.find((m) => {
+        if (m.msg.startsWith("_command:")) {
+          const prefix = m.msg.replace("_command:", "");
+          const isStartsWith = msg.message.startsWith(prefix);
+          const suffix = msg.message.replace(prefix, "");
+          const matched = isStartsWith && (!suffix || suffix.startsWith(" "));
+          if (matched && m.redirect) {
+            replacedMsg = msg.message.replace(prefix, m.redirect);
+          }
+          return matched;
         }
-        return matched;
+        return m.msg === msg.message;
+      });
+      if (!matchedMsg) return;
+
+      const message = replacedMsg || matchedMsg.redirect || msg.message;
+      const cmd = await getCommandFromMessage(message);
+
+      // const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
+      //   message,
+      //   replyTo: msg.replyToMsgId,
+      // });
+      // if (cmd && sudoMsg)
+      //   await dealCommandPluginWithMessage({ cmd, msg: sudoMsg });
+      if (cmd) {
+        await dealCommandPluginWithMessage({ cmd, msg });
+      } else {
+        await msg.client?.sendMessage(msg.peerId, {
+          message,
+          replyTo: msg.replyToMsgId,
+        });
       }
-      return m.msg === msg.message;
-    });
-    if (!matchedMsg) return;
+      await sleep(2000);
+      try {
+        await msg.delete();
+      } catch (e) {}
+    };
+}
+const plugin = new surePlugin();
 
-    const message = replacedMsg || matchedMsg.redirect || msg.message;
-    const cmd = await getCommandFromMessage(message);
-
-    const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
-      message,
-      replyTo: msg.replyToMsgId,
-    });
-    if (cmd && sudoMsg)
-      await dealCommandPluginWithMessage({ cmd, msg: sudoMsg });
-    await sleep(2000);
-    try {
-      await msg.delete();
-    } catch (e) {}
-  },
-};
-
-export default surePlugin;
+export default plugin;
