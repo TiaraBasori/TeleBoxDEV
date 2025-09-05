@@ -1,9 +1,11 @@
+import { getPrefixes } from "@utils/pluginManager";
 import { Plugin } from "@utils/pluginBase";
 import { Api, client, TelegramClient } from "telegram";
 import { RPCError } from "telegram/errors";
-
+const prefixes = getPrefixes();
+const mainPrefix = prefixes[0];
 class RePlugin extends Plugin {
-  description: string = "复读\n回复一条消息即可复读";
+  description: string = `复读\n回复一条消息即可复读\n<code>${mainPrefix}re [消息数] [复读次数]</code>`;
   cmdHandlers: Record<
     string,
     (msg: Api.Message, trigger?: Api.Message) => Promise<void>
@@ -26,7 +28,7 @@ class RePlugin extends Plugin {
         });
         await msg.delete();
         for (let i = 0; i < repeat; i++) {
-          if (messages) {
+          if (messages && messages.length > 0) {
             for (const message of messages) {
               await message.forwardTo(msg.peerId);
             }
