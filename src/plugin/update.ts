@@ -47,14 +47,15 @@ async function update(force = false, msg: Api.Message) {
   }
 }
 
-const updatePlugin: Plugin = {
-  command: ["update"],
-  description: "更新项目：拉取最新代码并安装依赖",
-  cmdHandler: async (msg) => {
-    const args = msg.message.slice(1).split(" ").slice(1);
-    const force = args.includes("--force") || args.includes("-f");
-    await update(force, msg);
-  },
-};
+class UpdatePlugin extends Plugin {
+  description: string = `更新项目：拉取最新代码并安装依赖\n<code>.update -f/-force</code> 强制更新`;
+  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
+    update: async (msg) => {
+      const args = msg.message.slice(1).split(" ").slice(1);
+      const force = args.includes("--force") || args.includes("-f");
+      await update(force, msg);
+    },
+  };
+}
 
-export default updatePlugin;
+export default new UpdatePlugin();

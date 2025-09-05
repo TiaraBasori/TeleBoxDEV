@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import fs from "fs/promises";
 import { SendLogDB } from "@utils/sendLogDB";
+import { Api } from "telegram";
 
 async function findLogFiles(): Promise<{
   outLog: string | null;
@@ -58,130 +59,130 @@ function htmlEscape(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
-const sendLogPlugin: Plugin = {
-  command: ["sendlog", "logs", "log"],
-  description:
-    "发送日志文件到收藏夹或自定义目标\n.sendlog set <对话 ID|@用户名|me> 设置发送目标 (默认 me)",
-  cmdHandler: async (msg) => {
-    console.log("SendLog plugin triggered");
+const fn = async (msg) => {
+  console.log("SendLog plugin triggered");
 
-    const parts = msg.message.trim().split(/\s+/);
-    if (parts.length >= 2 && parts[0].startsWith(".") && parts[1] === "set") {
-      const target = parts[2];
-      if (!target) {
-        await msg.edit({ text: "用法: .sendlog set <chatId|me>" });
-        return;
-      }
-      const db = new SendLogDB();
-      db.setTarget(target);
-      db.close();
-      // 不暴露具体目标
-      await msg.edit({ text: `✅ 已设置日志发送目标` });
+  const parts = msg.message.trim().split(/\s+/);
+  if (parts.length >= 2 && parts[0].startsWith(".") && parts[1] === "set") {
+    const target = parts[2];
+    if (!target) {
+      await msg.edit({ text: "用法: .sendlog set <chatId|me>" });
+      return;
+    }
+    const db = new SendLogDB();
+    db.setTarget(target);
+    db.close();
+    // 不暴露具体目标
+    await msg.edit({ text: `✅ 已设置日志发送目标` });
+    return;
+  }
+
+  let target: string | number = "me";
+  const db = new SendLogDB();
+  target = db.getTarget();
+  db.close();
+
+  try {
+    // 初始响应不显示目标
+    await msg.edit({ text: `🔍 正在搜索日志文件...` });
+
+    const { outLog, errLog } = await findLogFiles();
+    console.log("Found logs:", { outLog, errLog });
+
+    if (!outLog && !errLog) {
+      await msg.edit({
+        text: "❌ 未找到日志文件\n\n已检查路径:\n• ~/.pm2/logs/telebox-*.log\n• ./logs/*.log\n• /var/log/telebox/*.log\n\n建议:\n• 检查PM2进程状态\n• 确认日志文件路径",
+      });
       return;
     }
 
-    let target: string | number = "me";
-    const db = new SendLogDB();
-    target = db.getTarget();
-    db.close();
+    let sentCount = 0;
+    const results: string[] = [];
 
-    try {
-      // 初始响应不显示目标
-      await msg.edit({ text: `🔍 正在搜索日志文件...` });
+    // 发送输出日志
+    if (outLog) {
+      try {
+        const stats = await fs.stat(outLog);
+        const sizeKB = Math.round(stats.size / 1024);
+        console.log(`Sending output log: ${outLog} (${sizeKB}KB) to ${target}`);
 
-      const { outLog, errLog } = await findLogFiles();
-      console.log("Found logs:", { outLog, errLog });
-
-      if (!outLog && !errLog) {
-        await msg.edit({
-          text: "❌ 未找到日志文件\n\n已检查路径:\n• ~/.pm2/logs/telebox-*.log\n• ./logs/*.log\n• /var/log/telebox/*.log\n\n建议:\n• 检查PM2进程状态\n• 确认日志文件路径",
-        });
-        return;
-      }
-
-      let sentCount = 0;
-      const results: string[] = [];
-
-      // 发送输出日志
-      if (outLog) {
-        try {
-          const stats = await fs.stat(outLog);
-          const sizeKB = Math.round(stats.size / 1024);
-          console.log(
-            `Sending output log: ${outLog} (${sizeKB}KB) to ${target}`
-          );
-
-          if (stats.size > 50 * 1024 * 1024) {
-            results.push(`⚠️ 输出日志过大 (${sizeKB}KB)，已跳过`);
-          } else {
-            await msg.client?.sendFile(target, {
-              file: outLog,
-              caption: `📄 输出日志 (${sizeKB}KB)\n📁 ${outLog}`,
-            });
-            results.push(`✅ 输出日志已发送 (${sizeKB}KB)`);
-            sentCount++;
-          }
-        } catch (error: any) {
-          console.error("Error sending output log:", error);
-          results.push(
-            `❌ 输出日志发送失败: ${
-              error.message?.substring(0, 50) || "未知错误"
-            }`
-          );
+        if (stats.size > 50 * 1024 * 1024) {
+          results.push(`⚠️ 输出日志过大 (${sizeKB}KB)，已跳过`);
+        } else {
+          await msg.client?.sendFile(target, {
+            file: outLog,
+            caption: `📄 输出日志 (${sizeKB}KB)\n📁 ${outLog}`,
+          });
+          results.push(`✅ 输出日志已发送 (${sizeKB}KB)`);
+          sentCount++;
         }
+      } catch (error: any) {
+        console.error("Error sending output log:", error);
+        results.push(
+          `❌ 输出日志发送失败: ${
+            error.message?.substring(0, 50) || "未知错误"
+          }`
+        );
       }
-
-      // 发送错误日志
-      if (errLog) {
-        try {
-          const stats = await fs.stat(errLog);
-          const sizeKB = Math.round(stats.size / 1024);
-          console.log(
-            `Sending error log: ${errLog} (${sizeKB}KB) to ${target}`
-          );
-
-          if (stats.size > 50 * 1024 * 1024) {
-            results.push(`⚠️ 错误日志过大 (${sizeKB}KB)，已跳过`);
-          } else {
-            await msg.client?.sendFile(target, {
-              file: errLog,
-              caption: `🚨 错误日志 (${sizeKB}KB)\n📁 ${errLog}`,
-            });
-            results.push(`✅ 错误日志已发送 (${sizeKB}KB)`);
-            sentCount++;
-          }
-        } catch (error: any) {
-          console.error("Error sending error log:", error);
-          results.push(
-            `❌ 错误日志发送失败: ${
-              error.message?.substring(0, 50) || "未知错误"
-            }`
-          );
-        }
-      }
-
-      const summaryText = [
-        sentCount > 0 ? "📋 日志发送完成" : "⚠️ 日志发送失败",
-        "",
-        ...results,
-        "",
-        sentCount > 0 ? `📱 日志文件已发送` : "💡 建议检查日志文件路径和权限",
-      ].join("\n");
-
-      await msg.edit({ text: summaryText });
-    } catch (error: any) {
-      console.error("SendLog plugin error:", error);
-      const errorMsg =
-        error.message?.length > 100
-          ? error.message.substring(0, 100) + "..."
-          : error.message;
-      await msg.edit({
-        text: `❌ 日志发送失败\n\n错误信息: ${
-          errorMsg || "未知错误"
-        }\n\n可能的解决方案:\n• 检查文件权限\n• 确认PM2进程状态\n• 重启telebox服务`,
-      });
     }
-  },
+
+    // 发送错误日志
+    if (errLog) {
+      try {
+        const stats = await fs.stat(errLog);
+        const sizeKB = Math.round(stats.size / 1024);
+        console.log(`Sending error log: ${errLog} (${sizeKB}KB) to ${target}`);
+
+        if (stats.size > 50 * 1024 * 1024) {
+          results.push(`⚠️ 错误日志过大 (${sizeKB}KB)，已跳过`);
+        } else {
+          await msg.client?.sendFile(target, {
+            file: errLog,
+            caption: `🚨 错误日志 (${sizeKB}KB)\n📁 ${errLog}`,
+          });
+          results.push(`✅ 错误日志已发送 (${sizeKB}KB)`);
+          sentCount++;
+        }
+      } catch (error: any) {
+        console.error("Error sending error log:", error);
+        results.push(
+          `❌ 错误日志发送失败: ${
+            error.message?.substring(0, 50) || "未知错误"
+          }`
+        );
+      }
+    }
+
+    const summaryText = [
+      sentCount > 0 ? "📋 日志发送完成" : "⚠️ 日志发送失败",
+      "",
+      ...results,
+      "",
+      sentCount > 0 ? `📱 日志文件已发送` : "💡 建议检查日志文件路径和权限",
+    ].join("\n");
+
+    await msg.edit({ text: summaryText });
+  } catch (error: any) {
+    console.error("SendLog plugin error:", error);
+    const errorMsg =
+      error.message?.length > 100
+        ? error.message.substring(0, 100) + "..."
+        : error.message;
+    await msg.edit({
+      text: `❌ 日志发送失败\n\n错误信息: ${
+        errorMsg || "未知错误"
+      }\n\n可能的解决方案:\n• 检查文件权限\n• 确认PM2进程状态\n• 重启telebox服务`,
+    });
+  }
 };
 
-export default sendLogPlugin;
+class SendLogPlugin extends Plugin {
+  description: string = `发送日志文件到收藏夹或自定义目标\n.sendlog set <对话 ID|@用户名|me> 设置发送目标 (默认 me)`;
+  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
+    sendlog: fn,
+    logs: fn,
+    log: fn,
+  };
+}
+
+export default new SendLogPlugin();

@@ -21,13 +21,14 @@ async function handleExec(params: { msg: Api.Message; shellCommand: string }) {
   }
 }
 
-const execPlugin: Plugin = {
-  command: ["exec"],
-  description: "运行 shell 命令",
-  cmdHandler: async (msg) => {
-    const shellCommand = msg.message.slice(1).replace(/^\S+\s+/, ""); // 因为用户可能会更改重定向命令 用正则可能更稳妥
-    await handleExec({ msg, shellCommand });
-  },
-};
+class ExecPlugin extends Plugin {
+  description: string = `运行 shell 命令`;
+  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
+    exec: async (msg) => {
+      const shellCommand = msg.message.slice(1).replace(/^\S+\s+/, ""); // 因为用户可能会更改重定向命令 用正则可能更稳妥
+      await handleExec({ msg, shellCommand });
+    },
+  };
+}
 
-export default execPlugin;
+export default new ExecPlugin();

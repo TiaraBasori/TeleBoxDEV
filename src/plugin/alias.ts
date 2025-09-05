@@ -41,29 +41,29 @@ async function listAlias(args: string[], msg: Api.Message) {
   await msg.edit({ text: "重命名列表：\n" + text });
 }
 
-const aliasPlugin: Plugin = {
-  command: ["alias"],
-  description:
-    `插件命名重命名\n` +
-    `.alias set a b, a -> b\n` +
-    `.alias del a\n` +
-    `.alias ls`,
-  cmdHandler: async (msg) => {
-    const [, ...args] = msg.message.split(" ");
-    if (args.length == 0) {
-      await msg.edit({
-        text: "不知道你要干什么！",
-      });
-    }
-    const cmd = args[0];
-    if (cmd == "set") {
-      await setAlias(args, msg);
-    } else if (cmd == "del") {
-      await delAlias(args, msg);
-    } else if (cmd == "ls" || cmd == "list") {
-      await listAlias(args, msg);
-    }
-  },
-};
+class AliasPlugin extends Plugin {
+  description: string = `插件命名重命名
+<code>.alias set a b</code> <code>a</code> -> <code>b</code>
+<code>.alias del a</code>
+<code>.alias ls</code>`;
+  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
+    alias: async (msg) => {
+      const [, ...args] = msg.message.split(" ");
+      if (args.length == 0) {
+        await msg.edit({
+          text: "不知道你要干什么！",
+        });
+      }
+      const cmd = args[0];
+      if (cmd == "set") {
+        await setAlias(args, msg);
+      } else if (cmd == "del") {
+        await delAlias(args, msg);
+      } else if (cmd == "ls" || cmd == "list") {
+        await listAlias(args, msg);
+      }
+    },
+  };
+}
 
-export default aliasPlugin;
+export default new AliasPlugin();
