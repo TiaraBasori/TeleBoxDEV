@@ -580,7 +580,6 @@ async function updateAllPlugins(msg: Api.Message) {
     for (let i = 0; i < dbPlugins.length; i++) {
       const pluginName = dbPlugins[i];
       const pluginRecord = db.data[pluginName];
-      console.log(pluginRecord);
       const progress = Math.round(((i + 1) / totalPlugins) * 100);
       const progressBar = generateProgressBar(progress);
 

@@ -27,14 +27,19 @@ function formatCommandList(commands: string[]): string {
     const pluginEntry = getPluginEntry(cmd);
     if (pluginEntry && pluginEntry.plugin.cmdHandlers) {
       const cmdHandlerKeys = Object.keys(pluginEntry.plugin.cmdHandlers);
-      if (cmdHandlerKeys.length > 1) {
+      if (cmdHandlerKeys.length > 0) {
         const mainCommand = cmdHandlerKeys[0];
-        if (!pluginGroups.has(mainCommand)) {
-          pluginGroups.set(mainCommand, cmdHandlerKeys);
+        if (
+          cmdHandlerKeys.length === 1 &&
+          !singleCommands.includes(mainCommand)
+        ) {
+          singleCommands.push(mainCommand);
+        } else {
+          if (!pluginGroups.has(mainCommand)) {
+            pluginGroups.set(mainCommand, cmdHandlerKeys);
+          }
         }
       }
-    } else {
-      singleCommands.push(cmd);
     }
   });
 

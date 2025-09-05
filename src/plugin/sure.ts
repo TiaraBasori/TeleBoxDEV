@@ -7,6 +7,16 @@ import {
   getCommandFromMessage,
 } from "@utils/pluginManager";
 
+// HTML escape function
+function htmlEscape(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 // 简单缓存 sure 用户 ID，减少频繁 IO
 let sureCache = {
   ids: [] as number[],
