@@ -44,7 +44,10 @@ class CronManager {
   /**
    * 列出所有任务
    */
-  ls(): string[] {
+  ls(raw?: boolean): string[] | Map<string, CronTask> {
+    if (raw) {
+      return this.tasks;
+    }
     return Array.from(this.tasks.keys());
   }
 

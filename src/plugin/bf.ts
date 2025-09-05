@@ -1286,7 +1286,7 @@ class BfPlugin extends Plugin {
           const status = await ScheduledBackupService.getStatus();
           if (!status.enabled) {
             await msg.edit({
-              text: "⏰ 定时备份未启用\n\n使用 `bf cron help` 查看帮助",
+              text: "⏰ 定时备份未启用\n\n使用 <code>bf cron help</code> 查看帮助",
               parseMode: "html",
             });
           } else {

@@ -385,9 +385,9 @@ async function search(msg: Api.Message) {
     const repoLink = `\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
 
     const message = `🔍 <b>远程插件列表:</b>\n\n${statsInfo}\n\n<b>插件详情:</b>\n${pluginList}\n${installTip}\n${repoLink}`;
-    // 检查消息长度，如果超过 4000 则分段发送
-    if (message.length > 4000) {
-      const maxLength = 4000;
+    // 检查消息长度，如果超过 3500 则分段发送
+    if (message.length > 3500) {
+      const maxLength = 3500;
       const parts = [];
       let currentPart = "";
 
@@ -501,8 +501,8 @@ async function showPluginRecords(msg: Api.Message) {
 
     let message = `📚 <b>已安装插件记录 (${dbNames.length}个)</b>\n\n${dbSection}${notInDbSection}`;
 
-    if (message.length > 4000) {
-      const maxLength = 4000;
+    if (message.length > 3500) {
+      const maxLength = 3500;
       const parts = [];
       let currentPart = "";
 

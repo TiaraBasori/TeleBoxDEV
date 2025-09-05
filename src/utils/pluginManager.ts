@@ -18,12 +18,12 @@ const plugins: Map<string, PluginEntry> = new Map();
 const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
 const DEFAUTL_PLUGIN_PATH = path.join(process.cwd(), "src", "plugin");
 
-function getPrefixs(): string[] {
-  let prefixs: string[] = ["$", ".", "。"];
+function getPrefixes(): string[] {
+  let prefixes: string[] = [".", "。", "$"];
   if (process.env.NODE_ENV === "development") {
-    prefixs = ["！", "!"];
+    prefixes = ["!", "！"];
   }
-  return prefixs;
+  return prefixes;
 }
 
 function dynamicRequireWithDeps(filePath: string) {
@@ -77,9 +77,9 @@ function listCommands(): string[] {
 }
 
 function getCommandFromMessage(msg: Api.Message | string): string | null {
-  let prefixs = getPrefixs();
+  let prefixes = getPrefixes();
   const text = typeof msg === "string" ? msg : msg.message;
-  if (!prefixs.some((p) => text.startsWith(p))) return null;
+  if (!prefixes.some((p) => text.startsWith(p))) return null;
   const [cmd] = text.slice(1).split(" ");
   if (!cmd) return null;
   return cmd;
@@ -186,7 +186,7 @@ async function loadPlugins() {
 }
 
 export {
-  getPrefixs,
+  getPrefixes,
   loadPlugins,
   listCommands,
   getPluginEntry,
