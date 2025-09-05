@@ -7,6 +7,10 @@ import { Plugin } from "@utils/pluginBase";
 import fs from "fs";
 import path from "path";
 import { Api } from "telegram";
+import { AliasDB } from "@utils/aliasDB";
+
+const prefixes = getPrefixes();
+const mainPrefix = prefixes[0];
 
 function readVersion(): string {
   try {
@@ -48,11 +52,20 @@ function formatCommandList(commands: string[]): string {
   });
 
   const result: string[] = [];
-
+  const aliasDB = new AliasDB();
   // 基础命令显示
   if (singleCommands.length > 0) {
     const formattedCommands = singleCommands
-      .map((cmd) => `<code>${cmd}</code>`)
+      .map((cmd) => {
+        const alias = aliasDB.getOriginal(cmd);
+        return `<code>${cmd}</code>${
+          alias?.length > 0
+            ? ` (<code>${alias
+                .map((a) => `<code>${a}</code>`)
+                .join(", ")}</code>)`
+            : ""
+        }`;
+      })
       .join(" • ");
     result.push(`📋 <b>基础命令:</b> ${formattedCommands}`);
   }
@@ -61,22 +74,22 @@ function formatCommandList(commands: string[]): string {
   if (pluginGroups.size > 0) {
     result.push(`\n🔧 <b>功能模块:</b>`);
     for (const [mainCommand, subCommands] of pluginGroups) {
-      // 特殊处理：speedtest插件以speedtest为主命令显示
-      if (mainCommand === "s" && subCommands.includes("speedtest")) {
-        const otherCommands = subCommands.filter((cmd) => cmd !== "speedtest");
-        const formattedSubs = otherCommands
-          .map((cmd) => `<code>${cmd}</code>`)
-          .join(" • ");
-        result.push(`<b>speedtest:</b> ${formattedSubs}`);
-      } else {
-        const formattedSubs = subCommands
-          .map((cmd) => `<code>${cmd}</code>`)
-          .join(" • ");
-        result.push(`<b>${mainCommand}:</b> ${formattedSubs}`);
-      }
+      const formattedSubs = subCommands
+        .map((cmd) => {
+          const alias = aliasDB.getOriginal(cmd);
+          return `<code>${cmd}</code>${
+            alias?.length > 0
+              ? ` (<code>${alias
+                  .map((a) => `<code>${a}</code>`)
+                  .join(", ")}</code>)`
+              : ""
+          }`;
+        })
+        .join(" • ");
+      result.push(`<b>${mainCommand}:</b> ${formattedSubs}`);
     }
   }
-
+  aliasDB.close();
   return result.join("\n");
 }
 
@@ -106,17 +119,16 @@ class HelpPlugin extends Plugin {
         const commands = listCommands();
         const version = readVersion();
         const totalCommands = commands.length;
-        const prefixes = getPrefixes();
 
         const helpText = [
-          `🚀 <b>TeleBox v${htmlEscape(version)}</b> | ${totalCommands}个命令`,
+          `🚀 <b>TeleBox v${htmlEscape(version)}</b> | ${totalCommands} 个命令`,
           "",
           formatCommandList(commands),
           "",
           `❕ <b>指令前缀：</b> ${prefixes
             .map((p) => `<code>${htmlEscape(p)}</code>`)
             .join(" • ")}`,
-          `💡 <code>${prefixes[0]}help [命令]</code> 查看详情 | <code>${prefixes[0]}tpm search</code> 显示远程插件列表`,
+          `💡 <code>${mainPrefix}help [命令]</code> 查看详情 | <code>${mainPrefix}tpm search</code> 显示远程插件列表`,
           "🔗 <a href='https://github.com/TeleBoxDev/TeleBox'>📦仓库</a> | <a href='https://github.com/TeleBoxDev/TeleBox_Plugins'>🔌插件</a>",
         ].join("\n");
 
@@ -145,12 +157,23 @@ class HelpPlugin extends Plugin {
       const plugin = pluginEntry.plugin;
       const commands = Object.keys(plugin.cmdHandlers);
 
-      // 格式化命令别名
-      const aliases = Array.isArray(commands) ? commands : [commands];
-      const aliasText = aliases
-        .map((alias) => `<code>.${alias}</code>`)
-        .join(" • ");
+      // 格式化命令
+      const aliasDB = new AliasDB();
+      const cmds = Array.isArray(commands) ? commands : [commands];
+      const cmdsText = cmds
+        .map((cmd) => {
+          const alias = aliasDB.getOriginal(cmd);
 
+          return `<code>${mainPrefix}${cmd}</code>${
+            alias?.length > 0
+              ? ` (<code>${alias
+                  .map((a) => `<code>${a}</code>`)
+                  .join(", ")}</code>)`
+              : ""
+          }`;
+        })
+        .join(" • ");
+      aliasDB.close();
       let description: string | void;
 
       if (!plugin.description) {
@@ -186,11 +209,11 @@ class HelpPlugin extends Plugin {
         `📝 <b>功能描述:</b>`,
         `${description || "暂无描述信息"}`,
         "",
-        `🏷️ <b>命令别名:</b>`,
-        `${aliasText}`,
+        `🏷️ <b>命令:</b>`,
+        `${cmdsText}`,
         "",
         `⚡ <b>使用方法:</b>`,
-        `<code>.${command} [参数]</code>`,
+        `<code>${mainPrefix}${command} [参数]</code>`,
         cronTasksInfo,
         "💡 <i>提示: 使用</i> <code>.help</code> <i>查看所有命令</i>",
       ].join("\n");

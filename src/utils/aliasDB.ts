@@ -79,6 +79,21 @@ class AliasDB {
       .get(original);
     return row ? row.final : null;
   }
+  /**
+   * 根据 final 获取所有 original
+   * @param final
+   * @returns original 字符串数组，找不到则返回空数组
+   */
+  public getOriginal(final: string): string[] {
+    const rows = this.db
+      .prepare<[string], { original: string }>(
+        `
+      SELECT original FROM aliases WHERE final = ?
+    `
+      )
+      .all(final);
+    return rows.map((row) => row.original);
+  }
 
   /**
    * 关闭数据库

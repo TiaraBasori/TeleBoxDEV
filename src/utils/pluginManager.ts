@@ -38,7 +38,7 @@ function dynamicRequireWithDeps(filePath: string) {
 
 async function setPlugins(basePath: string) {
   const files = fs.readdirSync(basePath).filter((file) => file.endsWith(".ts"));
-  const db = new AliasDB();
+  const aliasDB = new AliasDB();
   for (const file of files) {
     const pluginPath = path.resolve(basePath, file);
     const mod = await dynamicRequireWithDeps(pluginPath);
@@ -49,14 +49,16 @@ async function setPlugins(basePath: string) {
       const cmds = Object.keys(plugin.cmdHandlers);
       for (const cmd of cmds) {
         plugins.set(cmd, { plugin });
-        const alias = db.get(cmd);
-        if (alias) {
-          plugins.set(alias, { original: alias, plugin });
+        const alias = aliasDB.getOriginal(cmd);
+        if (alias?.length > 0) {
+          alias.forEach((a) => {
+            plugins.set(a, { original: cmd, plugin });
+          });
         }
       }
     }
   }
-  db.close();
+  aliasDB.close();
 }
 
 function getPluginEntry(command: string): PluginEntry | undefined {
@@ -68,7 +70,7 @@ function listCommands(): string[] {
   for (const key of plugins.keys()) {
     const entry = plugins.get(key)!;
     if (entry.original) {
-      cmds.set(key, `${entry.original}(${key})`);
+      cmds.set(key, `${key}(${entry.original})`);
     } else {
       cmds.set(key, key);
     }
@@ -102,10 +104,10 @@ async function dealCommandPluginWithMessage(param: {
       }
     } else {
       const availableCommands = listCommands();
-      const helpText = `未知命令：${cmd}\n可用命令：${availableCommands.join(
-        ", "
-      )}`;
-      await msg.edit({ text: helpText });
+      const helpText = `未知命令：<code>${cmd}</code>\n可用命令：${availableCommands
+        .map((c) => `<code>${c}</code>`)
+        .join(", ")}`;
+      await msg.edit({ text: helpText, parseMode: "html" });
     }
   } catch (error) {
     console.log(error);

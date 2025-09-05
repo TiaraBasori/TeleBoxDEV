@@ -2,6 +2,10 @@ import { Plugin } from "@utils/pluginBase";
 import { AliasDB } from "@utils/aliasDB";
 import { Api } from "telegram";
 import { loadPlugins } from "@utils/pluginManager";
+import { getPrefixes } from "@utils/pluginManager";
+
+const prefixes = getPrefixes();
+const mainPrefix = prefixes[0];
 
 async function setAlias(args: string[], msg: Api.Message) {
   const db = new AliasDB();
@@ -43,9 +47,9 @@ async function listAlias(args: string[], msg: Api.Message) {
 
 class AliasPlugin extends Plugin {
   description: string = `插件命名重命名
-<code>.alias set a b</code> <code>a</code> -> <code>b</code>
-<code>.alias del a</code>
-<code>.alias ls</code>`;
+<code>${mainPrefix}alias set a b</code> - 即 使用别名 <code>a</code> 可以执行原始命令 <code>b</code>; 原始命令 <code>b</code> 可以有多个不重复的别名
+<code>${mainPrefix}alias del a</code>
+<code>${mainPrefix}alias ls</code>`;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     alias: async (msg) => {
       const [, ...args] = msg.message.split(" ");
