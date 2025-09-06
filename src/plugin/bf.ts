@@ -21,6 +21,57 @@ function formatCN(date: Date): string {
   return date.toLocaleString("zh-CN", { timeZone: CN_TIME_ZONE });
 }
 
+async function formatEntity(
+  target: any,
+  mention?: boolean,
+  throwErrorIfFailed?: boolean
+) {
+  const client = await getGlobalClient();
+  if (!client) throw new Error("Telegram 客户端未初始化");
+  if (!target) throw new Error("无效的目标");
+  let id: any;
+  let entity: any;
+  try {
+    entity = target?.className
+      ? target
+      : ((await client?.getEntity(target)) as any);
+    if (!entity) throw new Error("无法获取 entity");
+    id = entity.id;
+    if (!id) throw new Error("无法获取 entity id");
+  } catch (e: any) {
+    console.error(e);
+    if (throwErrorIfFailed)
+      throw new Error(
+        `无法获取 ${target} 的 entity: ${e?.message || "未知错误"}`
+      );
+  }
+  const displayParts: string[] = [];
+
+  if (entity?.title) displayParts.push(entity.title);
+  if (entity?.firstName) displayParts.push(entity.firstName);
+  if (entity?.lastName) displayParts.push(entity.lastName);
+  if (entity?.username)
+    displayParts.push(
+      mention ? `@${entity.username}` : `<code>@${entity.username}</code>`
+    );
+
+  if (id) {
+    displayParts.push(
+      entity instanceof Api.User
+        ? `<a href="tg://user?id=${id}">${id}</a>`
+        : `<a href="https://t.me/c/${id}">${id}</a>`
+    );
+  } else if (!target?.className) {
+    displayParts.push(`<code>${target}</code>`);
+  }
+
+  return {
+    id,
+    entity,
+    display: displayParts.join(" ").trim(),
+  };
+}
+
 // 类型定义
 interface BackupConfig {
   target_chat_ids: string[];
@@ -220,6 +271,7 @@ async function restoreBackup(extractPath: string): Promise<void> {
 
 const help_text = `<code>${mainPrefix}bf</code> 备份 plugins + assets 目录
 <code>${mainPrefix}bf set 对话ID</code> - 设置备份发送到的目标对话
+<code>${mainPrefix}bf to 对话ID</code> - 仅本次备份发送到目标对话
 <code>${mainPrefix}bf del 对话ID/all</code> - 删除备份发送到的目标对话
 <code>${mainPrefix}hf</code> 恢复备份`;
 
@@ -295,6 +347,29 @@ ${mainPrefix}acron cmd 0 0 2 * * * me 定时备份
         return;
       }
 
+      // 支持一次性目标: .bf to 对话ID
+      let oneTimeTargets: string[] | null = null;
+      if (cmd === "to") {
+        if (args.length < 2) {
+          await msg.edit({
+            text: help_text,
+            parseMode: "html",
+          });
+          return;
+        }
+        const ids = args
+          .slice(1)
+          .join(" ")
+          .replace(/,/g, " ")
+          .split(/\s+/)
+          .filter(Boolean);
+        if (ids.length === 0) {
+          await msg.edit({ text: "❌ 无效的聊天ID", parseMode: "html" });
+          return;
+        }
+        oneTimeTargets = ids;
+      }
+
       // 执行备份
       const client = await getGlobalClient();
 
@@ -335,10 +410,18 @@ ${mainPrefix}acron cmd 0 0 2 * * * me 定时备份
             .join(", ")}`;
 
         // 上传文件
-        const targets = await ConfigManager.getTargets();
-        const destinations = targets.length > 0 ? targets : ["me"];
+        const savedTargets = await ConfigManager.getTargets();
+        const destinations =
+          oneTimeTargets && oneTimeTargets.length > 0
+            ? oneTimeTargets
+            : savedTargets.length > 0
+            ? savedTargets
+            : ["me"];
+        const destDisplays = [];
 
         for (const dest of destinations) {
+          const { display } = await formatEntity(dest);
+          destDisplays.push(display);
           try {
             await client.sendFile(dest, {
               file: backupPath,
@@ -367,7 +450,7 @@ ${mainPrefix}acron cmd 0 0 2 * * * me 定时备份
         await msg.edit({
           text:
             `✅ <b>备份完成</b>\n\n` +
-            `🎯 <b>发送到</b>: ${destinations.join(", ")}\n` +
+            `🎯 <b>发送到</b>: ${destDisplays.join(", ")}\n` +
             `📦 <b>内容</b>: ${dirsToBackup
               .map((d) => path.basename(d))
               .join(", ")}\n` +
