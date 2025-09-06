@@ -18,11 +18,21 @@ const plugins: Map<string, PluginEntry> = new Map();
 const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
 const DEFAUTL_PLUGIN_PATH = path.join(process.cwd(), "src", "plugin");
 
+let prefixes = [".", "。", "$"];
+const envPrefixes =
+  process.env.TB_PREFIX?.split(/\s+/g).filter((p) => p.length > 0) || [];
+if (envPrefixes.length > 0) {
+  prefixes = envPrefixes;
+} else if (process.env.NODE_ENV === "development") {
+  prefixes = ["!", "！"];
+}
+console.log(
+  `[PREFIXES] ${prefixes.join(" ")} (${
+    envPrefixes.length > 0 ? "" : "可"
+  }使用环境变量 TB_PREFIX 覆盖)`
+);
+
 function getPrefixes(): string[] {
-  let prefixes: string[] = [".", "。", "$"];
-  if (process.env.NODE_ENV === "development") {
-    prefixes = ["!", "！"];
-  }
   return prefixes;
 }
 
