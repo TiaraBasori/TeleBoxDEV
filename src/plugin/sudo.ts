@@ -233,7 +233,7 @@ class sudoPlugin extends Plugin {
       if (!getSudoIds().includes(uid)) return;
       const cids = getSudoCids();
       if (cids.length > 0 && !cids.includes(cid)) return;
-      const cmd = await getCommandFromMessage(msg);
+      const cmd = getCommandFromMessage(msg);
       if (!cmd) return;
       // await dealCommandPluginWithMessage({ cmd, msg });
       const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
