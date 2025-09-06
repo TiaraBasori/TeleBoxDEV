@@ -107,7 +107,6 @@ class HelpPlugin extends Plugin {
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     help: this.handleHelp,
     h: this.handleHelp,
-    帮助: this.handleHelp,
   };
 
   private async handleHelp(msg: Api.Message): Promise<void> {
