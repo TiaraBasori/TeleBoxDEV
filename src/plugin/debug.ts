@@ -2,6 +2,11 @@ import { Plugin } from "@utils/pluginBase";
 import { getGlobalClient } from "@utils/globalClient";
 import { Api, TelegramClient } from "telegram";
 import { getPrefixes } from "@utils/pluginManager";
+import { CustomFile } from "telegram/client/uploads";
+import { createDirectoryInTemp } from "@utils/pathHelpers";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
 class DebugPlugin extends Plugin {
@@ -9,7 +14,10 @@ class DebugPlugin extends Plugin {
 <code>${mainPrefix}.entity [id/@name] 或 回复一条消息 或 留空查看当前对话</code> - 获取 entity 信息
 <code>${mainPrefix}.msg 回复一条消息</code> - 获取 msg 信息
 `;
-  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
+  cmdHandlers: Record<
+    string,
+    (msg: Api.Message, trigger?: Api.Message) => Promise<void>
+  > = {
     id: async (msg) => {
       const client = await getGlobalClient();
       let targetInfo = "";
@@ -53,24 +61,47 @@ class DebugPlugin extends Plugin {
       }
     },
 
-    entity: async (msg) => {
+    entity: async (msg, trigger) => {
       const [cmd, ...args] = msg.message.trim().split(/\s+/);
       const input = args.join("");
       const reply = await msg.getReplyMessage();
       const entity = await msg.client?.getEntity(
         input || reply?.senderId || msg.peerId
       );
-      console.log(entity);
-      msg.edit({
-        text: `<blockquote expandable>${JSON.stringify(
-          entity,
-          null,
-          2
-        )}</blockquote>`,
-        parseMode: "html",
-      });
+
+      const txt = JSON.stringify(entity, null, 2);
+      console.log(txt);
+
+      try {
+        await msg.edit({
+          text: `<blockquote expandable>${txt}</blockquote>`,
+          parseMode: "html",
+        });
+      } catch (error: any) {
+        // 如果编辑失败且是因为消息过长，则发送文件
+        if (
+          error.message &&
+          (error.message.includes("MESSAGE_TOO_LONG") ||
+            error.message.includes("too long"))
+        ) {
+          const buffer = Buffer.from(txt, "utf-8");
+          const dir = createDirectoryInTemp("exit");
+
+          const filename = `entity_${entity?.id}.json`;
+          const filePath = path.join(dir, filename);
+          fs.writeFileSync(filePath, buffer);
+          const size = fs.statSync(filePath).size;
+          await (trigger || msg).reply({
+            file: new CustomFile(filename, size, filePath),
+          });
+          fs.unlinkSync(filePath);
+        } else {
+          // 其他错误则重新抛出
+          throw error;
+        }
+      }
     },
-    msg: async (msg) => {
+    msg: async (msg, trigger) => {
       const reply = await msg.getReplyMessage();
       if (!reply) {
         await msg.edit({
@@ -78,15 +109,37 @@ class DebugPlugin extends Plugin {
         });
         return;
       }
-      console.log(reply);
-      msg.edit({
-        text: `<blockquote expandable>${JSON.stringify(
-          reply,
-          null,
-          2
-        )}</blockquote>`,
-        parseMode: "html",
-      });
+      const txt = JSON.stringify(reply, null, 2);
+      console.log(txt);
+
+      try {
+        await msg.edit({
+          text: `<blockquote expandable>${txt}</blockquote>`,
+          parseMode: "html",
+        });
+      } catch (error: any) {
+        // 如果编辑失败且是因为消息过长，则发送文件
+        if (
+          error.message &&
+          (error.message.includes("MESSAGE_TOO_LONG") ||
+            error.message.includes("too long"))
+        ) {
+          const buffer = Buffer.from(txt, "utf-8");
+          const dir = createDirectoryInTemp("exit");
+
+          const filename = `msg_${reply.id}.json`;
+          const filePath = path.join(dir, filename);
+          fs.writeFileSync(filePath, buffer);
+          const size = fs.statSync(filePath).size;
+          await (trigger || msg).reply({
+            file: new CustomFile(filename, size, filePath),
+          });
+          fs.unlinkSync(filePath);
+        } else {
+          // 其他错误则重新抛出
+          throw error;
+        }
+      }
     },
   };
 }
