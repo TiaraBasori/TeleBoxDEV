@@ -2,9 +2,38 @@ import { Plugin } from "@utils/pluginBase";
 import { loadPlugins } from "@utils/pluginManager";
 import { Api } from "telegram";
 import { getPrefixes } from "@utils/pluginManager";
+import { createDirectoryInTemp } from "@utils/pathHelpers";
+import fs from "fs";
+import path from "path";
+import { getGlobalClient } from "@utils/globalClient";
 
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
+
+const exitDir = createDirectoryInTemp("exit");
+const exitFile = path.join(exitDir, "msg.json");
+
+if (fs.existsSync(exitFile)) {
+  try {
+    const data = fs.readFileSync(exitFile, "utf-8");
+    const { messageId, chatId, time } = JSON.parse(data);
+    getGlobalClient().then((client) => {
+      if (client) {
+        client
+          .editMessage(chatId, {
+            message: messageId,
+            text: `✅ 重启完成, 耗时 ${Date.now() - time}ms`,
+          })
+          .then(() => {
+            fs.unlinkSync(exitFile);
+          })
+          .catch(() => {
+            // Ignore errors when cleaning up
+          });
+      }
+    });
+  } catch (e) {}
+}
 
 class ReloadPlugin extends Plugin {
   description:
@@ -21,8 +50,12 @@ class ReloadPlugin extends Plugin {
         const startTime = Date.now();
         await loadPlugins();
         const loadTime = Date.now() - startTime;
+        const timeText =
+          loadTime > 1000
+            ? `${(loadTime / 1000).toFixed(2)}s`
+            : `${loadTime}ms`;
         await msg.edit({
-          text: `✅ 插件已重新加载完成 (耗时: ${loadTime}ms)`,
+          text: `✅ 插件已重新加载完成 (耗时: ${timeText})`,
         });
       } catch (error) {
         console.error("Plugin reload failed:", error);
@@ -34,9 +67,20 @@ class ReloadPlugin extends Plugin {
       }
     },
     exit: async (msg) => {
-      await msg.edit({
+      const result = await msg.edit({
         text: "🔄 结束进程...若配置了进程管理工具, 将自动重启",
       });
+      if (result) {
+        fs.writeFileSync(
+          exitFile,
+          JSON.stringify({
+            messageId: result.id,
+            chatId: result.chatId || result.peerId,
+            time: Date.now(),
+          }),
+          "utf-8"
+        );
+      }
       process.exit(0);
     },
   };
