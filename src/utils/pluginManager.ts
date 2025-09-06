@@ -103,6 +103,7 @@ async function dealCommandPluginWithMessage(param: {
   trigger?: Api.Message;
 }) {
   const { cmd, msg, trigger } = param;
+  if (!/^[a-z0-9_]+$/i.test(cmd)) return;
   const pluginEntry = getPluginEntry(cmd);
   try {
     if (pluginEntry) {
