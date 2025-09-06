@@ -94,8 +94,17 @@ function getCommandFromMessage(msg: Api.Message | string): string | null {
   if (!prefixes.some((p) => text.startsWith(p))) return null;
   const [cmd] = text.slice(1).split(" ");
   if (!cmd) return null;
-  if (!/^[a-z0-9_]+$/i.test(cmd)) return null;
-  return cmd;
+  if (/^[a-z0-9_]+$/i.test(cmd)) return cmd;
+
+  const aliasDB = new AliasDB();
+
+  if (aliasDB.get(cmd)) {
+    aliasDB.close();
+    return cmd;
+  } else {
+    aliasDB.close();
+    return null;
+  }
 }
 
 async function dealCommandPluginWithMessage(param: {
@@ -104,7 +113,6 @@ async function dealCommandPluginWithMessage(param: {
   trigger?: Api.Message;
 }) {
   const { cmd, msg, trigger } = param;
-  // if (!/^[a-z0-9_]+$/i.test(cmd)) return;
   const pluginEntry = getPluginEntry(cmd);
   try {
     if (pluginEntry) {
