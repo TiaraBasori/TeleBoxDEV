@@ -94,6 +94,7 @@ function getCommandFromMessage(msg: Api.Message | string): string | null {
   if (!prefixes.some((p) => text.startsWith(p))) return null;
   const [cmd] = text.slice(1).split(" ");
   if (!cmd) return null;
+  if (!/^[a-z0-9_]+$/i.test(cmd)) return null;
   return cmd;
 }
 
