@@ -60,12 +60,20 @@ function extractId(from: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function buildDisplay(id: number, entity: any, isUser: boolean) {
+function buildDisplay(
+  id: number,
+  entity: any,
+  isUser: boolean,
+  mention?: boolean
+) {
   const parts: string[] = [];
   if (entity?.title) parts.push(entity.title);
   if (entity?.firstName) parts.push(entity.firstName);
   if (entity?.lastName) parts.push(entity.lastName);
-  if (entity?.username) parts.push(`@${entity.username}`);
+  if (entity?.username)
+    parts.push(
+      mention ? `@${entity.username}` : `<code>@${entity.username}</code>`
+    );
   parts.push(
     isUser
       ? `<a href="tg://user?id=${id}">${id}</a>`
