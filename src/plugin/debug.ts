@@ -11,8 +11,9 @@ const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
 class DebugPlugin extends Plugin {
   description: string = `<code>${mainPrefix}id 回复一条消息 或 留空查看当前对话</code> - 获取详细的用户、群组或频道信息
-<code>${mainPrefix}.entity [id/@name] 或 回复一条消息 或 留空查看当前对话</code> - 获取 entity 信息
-<code>${mainPrefix}.msg 回复一条消息</code> - 获取 msg 信息
+<code>${mainPrefix}entity [id/@name] 或 回复一条消息 或 留空查看当前对话</code> - 获取 entity 信息
+<code>${mainPrefix}msg 回复一条消息</code> - 获取 msg 信息
+<code>${mainPrefix}echo 回复一条消息</code> - 尝试以原样回复
 `;
   cmdHandlers: Record<
     string,
@@ -110,7 +111,6 @@ class DebugPlugin extends Plugin {
         return;
       }
       const txt = JSON.stringify(reply, null, 2);
-      console.log(txt);
 
       try {
         await msg.edit({
@@ -140,6 +140,21 @@ class DebugPlugin extends Plugin {
           throw error;
         }
       }
+    },
+    echo: async (msg, trigger) => {
+      const reply = await msg.getReplyMessage();
+      if (!reply) {
+        await msg.edit({
+          text: `请回复一条消息以尝试原样发出`,
+        });
+        return;
+      }
+      const txt = JSON.stringify(reply, null, 2);
+
+      await (trigger || msg).reply({
+        message: reply,
+        formattingEntities: reply.entities,
+      });
     },
   };
 }
