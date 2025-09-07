@@ -367,6 +367,7 @@ class surePlugin extends Plugin {
       const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
         message,
         replyTo: msg.replyToMsgId,
+        formattingEntities: message.entities,
       });
       if (cmd && sudoMsg)
         await dealCommandPluginWithMessage({ cmd, msg: sudoMsg, trigger: msg });

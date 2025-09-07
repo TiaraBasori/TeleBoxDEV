@@ -239,6 +239,7 @@ class sudoPlugin extends Plugin {
       const sudoMsg = await msg.client?.sendMessage(msg.peerId, {
         message: msg.message,
         replyTo: msg.replyToMsgId,
+        formattingEntities: msg.entities,
       });
       if (sudoMsg)
         await dealCommandPluginWithMessage({ cmd, msg: sudoMsg, trigger: msg });
