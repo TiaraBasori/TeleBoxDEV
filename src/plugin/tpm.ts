@@ -382,9 +382,11 @@ async function search(msg: Api.Message) {
 
     const installTip =
       `\n💡 <b>安装方法:</b>\n` +
-      `• <code>tpm i &lt;插件名&gt;</code> - 安装单个插件\n` +
-      `• <code>tpm i all</code> - 一键安装全部远程插件\n` +
-      `• <code>tpm rm &lt;插件名&gt;</code> - 卸载插件`;
+      `• <code>${mainPrefix}tpm i &lt;插件名&gt;</code> - 安装单个插件\n` +
+      `• <code>${mainPrefix}tpm i all</code> - 一键安装全部远程插件\n` +
+      `• <code>${mainPrefix}tpm update</code> - 一键更新所有已安装的远程插件\n` +
+      `• <code>${mainPrefix}tpm ls</code> - 查看已安装记录\n` +
+      `• <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> - 卸载插件`;
 
     const repoLink = `\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
 
