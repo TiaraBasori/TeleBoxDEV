@@ -9,6 +9,10 @@ import fs from "fs";
 import axios from "axios";
 import { Api } from "telegram";
 import { JSONFilePreset } from "lowdb/node";
+import { getPrefixes } from "@utils/pluginManager";
+
+const prefixes = getPrefixes();
+const mainPrefix = prefixes[0];
 
 // 数据库类型定义 (精简: 直接用 根对象 { [name]: PluginRecord })
 interface PluginRecord {
@@ -440,9 +444,9 @@ async function search(msg: Api.Message) {
   }
 }
 
-async function showPluginRecords(msg: Api.Message) {
+async function showPluginRecords(msg: Api.Message, verbose?: boolean) {
   try {
-    await msg.edit({ text: "📚 正在读取插件数据库..." });
+    await msg.edit({ text: "📚 正在读取插件数据..." });
     const db = await getDatabase();
     const dbNames = Object.keys(db.data);
 
@@ -474,12 +478,14 @@ async function showPluginRecords(msg: Api.Message) {
 
     const dbSection =
       dbNames.length === 0
-        ? "📚 数据库中暂无插件记录"
+        ? ""
         : sortedPlugins
             .map((p) => {
               const updateTime = new Date(p._updatedAt).toLocaleString("zh-CN");
               const description = p.desc ? `\n📝 ${p.desc}` : "";
-              return `<code>${p.name}</code> 🕒 ${updateTime}${description}\n🔗 <a href="${p.url}">URL</a>`;
+              return verbose
+                ? `<code>${p.name}</code> 🕒 ${updateTime}${description}\n🔗 <a href="${p.url}">URL</a>`
+                : `<code>${p.name}</code>${p.desc ? ` - ${p.desc}` : ""}`;
             })
             .join("\n\n");
 
@@ -493,13 +499,21 @@ async function showPluginRecords(msg: Api.Message) {
             const stat = fs.statSync(filePath);
             mtime = stat.mtime.toLocaleString("zh-CN");
           } catch {}
-          return `<code>${name}</code> 🗄 ${mtime}`;
+          return verbose
+            ? `<code>${name}</code> 🗄 ${mtime}`
+            : `<code>${name}</code>`;
         })
         .join("\n\n");
       notInDbSection = `\n\n🗂 <b>本地插件 (${notInDb.length}个):</b>\n\n${details}`;
     }
 
-    let message = `📚 <b>已安装插件记录 (${dbNames.length}个)</b>\n\n${dbSection}${notInDbSection}`;
+    let message = `${
+      verbose
+        ? ""
+        : `💡 可使用 <code>${mainPrefix}tpm ls -v</code> 查看详情信息\n\n`
+    }📚 <b>远程插件记录 (${dbNames.length}个)</b>${
+      dbNames.length === 0 ? "\n" : `\n\n`
+    }${dbSection}${notInDbSection}`;
 
     if (message.length > 3500) {
       const maxLength = 3500;
@@ -684,14 +698,15 @@ async function updateAllPlugins(msg: Api.Message) {
 }
 
 class TpmPlugin extends Plugin {
-  description: string = `本地资源: 对某个文件回复 <code>tpm install</code>
-远程资源: <code>tpm install plugin_name</code>, <code>tpm i plugin_name</code>
-批量安装: <code>tpm i all</code> - 一键安装所有远程插件
-卸载插件: <code>tpm remove plugin_name</code>, <code>tpm rm plugin_name</code>, <code>tpm un plugin_name</code>, <code>tpm uninstall plugin_name</code>
-显示远程插件列表: <code>tpm search</code>
-查看已安装记录: <code>tpm list</code>, <code>tpm ls</code>
-一键更新插件: <code>tpm update</code> - 更新所有已安装的插件
-上传插件: <code>tpm upload plugin_name</code>
+  description: string = `显示远程插件列表: <code>${mainPrefix}tpm search</code>
+安装远程插件: <code>${mainPrefix}tpm install name</code>, <code>${mainPrefix}tpm i name</code>
+从 Telegram 文件安装插件: 对某个文件回复 <code>${mainPrefix}tpm install</code>
+一键安装所有远程插件: <code>${mainPrefix}tpm i all</code>
+卸载插件: <code>${mainPrefix}tpm remove name</code>, <code>${mainPrefix}tpm rm name</code>, <code>${mainPrefix}tpm un name</code>, <code>${mainPrefix}tpm uninstall name</code>
+一键更新所有已安装的远程插件: <code>${mainPrefix}tpm update</code>
+查看已安装记录精简版: <code>${mainPrefix}tpm list</code>, <code>${mainPrefix}tpm ls</code>
+查看已安装记录详细版: <code>${mainPrefix}tpm list -v</code>, <code>${mainPrefix}tpm ls -v</code>, <code>${mainPrefix}tpm lv</code>
+上传插件: <code>${mainPrefix}tpm upload name</code>
 `;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     tpm: async (msg) => {
@@ -715,8 +730,11 @@ class TpmPlugin extends Plugin {
         await uploadPlugin(args, msg);
       } else if (cmd === "search") {
         await search(msg);
-      } else if (cmd === "list" || cmd === "ls" || cmd === "records") {
-        await showPluginRecords(msg);
+      } else if (cmd === "list" || cmd === "ls" || cmd === "lv") {
+        await showPluginRecords(
+          msg,
+          ["-v", "--verbose"].includes(args[1]) || cmd === "lv"
+        );
       } else if (cmd === "update") {
         await updateAllPlugins(msg);
       } else if (cmd === "updateAll" || cmd === "ua") {
