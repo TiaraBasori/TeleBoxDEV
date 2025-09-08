@@ -159,6 +159,18 @@ function dealListenMessagePlugin(client: TelegramClient): void {
         }
       }, new NewMessage());
     }
+    const eventHandlers = plugin.eventHandlers;
+    if (Array.isArray(eventHandlers) && eventHandlers.length > 0) {
+      for (const { event, handler } of eventHandlers) {
+        client.addEventHandler(async (event: any) => {
+          try {
+            await handler(event);
+          } catch (error) {
+            console.log("eventHandler error:", error);
+          }
+        }, event);
+      }
+    }
   }
 }
 

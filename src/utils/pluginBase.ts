@@ -16,6 +16,10 @@ abstract class Plugin {
     (msg: Api.Message, trigger?: Api.Message) => Promise<void>
   >;
   listenMessageHandler?: (msg: Api.Message) => Promise<void>;
+  eventHandlers?: Array<{
+    event?: any;
+    handler: (event: any) => Promise<void>;
+  }>;
   cronTasks?: Record<string, CronTask>;
 }
 
