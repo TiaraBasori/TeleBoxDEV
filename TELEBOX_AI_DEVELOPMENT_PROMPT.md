@@ -381,7 +381,7 @@ const help_text = `🚀 <b>示例插件 - 完整标准实现</b>
 • <code>${mainPrefix}example help</code> - 显示此帮助`;
 
 class ExamplePlugin extends Plugin {
-  description: string = `示例插件 - 展示TeleBox标准开发规范\n\n${help_text}`;
+  description: string = help_text;
   
   cmdHandlers: Record<string, (msg: Api.Message, trigger?: Api.Message) => Promise<void>> = {
     example: async (msg: Api.Message) => {
