@@ -160,10 +160,95 @@ class DebugPlugin extends Plugin {
       const txt = JSON.stringify(reply, null, 2);
       console.log(txt);
 
-      await (trigger || msg).reply({
-        message: reply,
-        formattingEntities: reply.entities,
-      });
+      // gramjs 支持不全...
+      // await (trigger || msg).reply({
+      //   message: reply,
+      //   formattingEntities: reply.entities,
+      // });
+
+      // 将消息中的媒体转换为可发送的 InputMedia（仅处理常见的照片/文件）
+      const toInputMedia = (
+        media: Api.TypeMessageMedia
+      ): Api.TypeInputMedia | undefined => {
+        try {
+          if (media instanceof Api.MessageMediaPhoto && media.photo) {
+            if (media.photo instanceof Api.Photo) {
+              const inputPhoto = new Api.InputPhoto({
+                id: media.photo.id,
+                accessHash: media.photo.accessHash,
+                fileReference: media.photo.fileReference,
+              });
+              return new Api.InputMediaPhoto({
+                id: inputPhoto,
+                ...(media.spoiler ? { spoiler: true } : {}),
+                ...(media.ttlSeconds ? { ttlSeconds: media.ttlSeconds } : {}),
+              });
+            }
+          }
+          if (
+            media instanceof Api.MessageMediaDocument &&
+            media.document &&
+            media.document instanceof Api.Document
+          ) {
+            const inputDoc = new Api.InputDocument({
+              id: media.document.id,
+              accessHash: media.document.accessHash,
+              fileReference: media.document.fileReference,
+            });
+            return new Api.InputMediaDocument({
+              id: inputDoc,
+              ...(media.spoiler ? { spoiler: true } : {}),
+              ...(media.ttlSeconds ? { ttlSeconds: media.ttlSeconds } : {}),
+            });
+          }
+        } catch (e) {
+          console.warn("[debug.echo] 构造 InputMedia 失败", e);
+        }
+        return undefined;
+      };
+
+      const inputMedia = reply.media ? toInputMedia(reply.media) : undefined;
+
+      if (inputMedia) {
+        await msg.client?.invoke(
+          new Api.messages.SendMedia({
+            peer: reply.chatId,
+            message: reply.message || "",
+            media: inputMedia,
+            entities: reply.entities,
+            ...(reply.replyTo
+              ? {
+                  replyTo: new Api.InputReplyToMessage({
+                    replyToMsgId: reply.replyTo.replyToMsgId!,
+                    quoteText: reply.replyTo.quoteText,
+                    quoteEntities: reply.replyTo.quoteEntities,
+                    quoteOffset: reply.replyTo.quoteOffset,
+                    topMsgId: reply.replyTo.replyToTopId,
+                  }),
+                }
+              : {}),
+          })
+        );
+      } else {
+        await msg.client?.invoke(
+          new Api.messages.SendMessage({
+            peer: reply.chatId,
+            message: reply.message,
+            entities: reply.entities,
+            ...(reply.replyTo
+              ? {
+                  replyTo: new Api.InputReplyToMessage({
+                    replyToMsgId: reply.replyTo.replyToMsgId!,
+                    quoteText: reply.replyTo.quoteText,
+                    quoteEntities: reply.replyTo.quoteEntities,
+                    quoteOffset: reply.replyTo.quoteOffset,
+                    topMsgId: reply.replyTo.replyToTopId,
+                  }),
+                }
+              : {}),
+          })
+        );
+      }
       await msg.delete();
     },
   };
