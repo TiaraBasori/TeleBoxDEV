@@ -282,8 +282,8 @@ class BfPlugin extends Plugin {
 若想实现定时备份, 可安装并使用 <code>${mainPrefix}tpm i acron</code>
 每天2点自动备份(调用 <code>${mainPrefix}bf</code> 命令)
 
-${mainPrefix}acron cmd 0 0 2 * * * me 定时备份
-.bf
+<pre>${mainPrefix}acron cmd 0 0 2 * * * me 定时备份
+.bf</pre>
 `;
 
   cmdHandlers = {
