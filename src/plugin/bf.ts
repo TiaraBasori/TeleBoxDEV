@@ -307,7 +307,15 @@ class BfPlugin extends Plugin {
           .replace(/,/g, " ")
           .split(/\s+/)
           .filter(Boolean);
-        const valid = ids.filter((id) => /^-?\d+$/.test(id));
+        const valid = ids
+          .filter((id) => /^-?\d+$/.test(id))
+          .map((id) => {
+            // 自动转换100开头的频道ID为负数
+            if (/^100\d+$/.test(id)) {
+              return `-${id}`;
+            }
+            return id;
+          });
 
         if (valid.length === 0) {
           await msg.edit({ text: "❌ 无效的聊天ID", parseMode: "html" });
@@ -362,7 +370,14 @@ class BfPlugin extends Plugin {
           .join(" ")
           .replace(/,/g, " ")
           .split(/\s+/)
-          .filter(Boolean);
+          .filter(Boolean)
+          .map((id) => {
+            // 自动转换100开头的频道ID为负数
+            if (/^100\d+$/.test(id)) {
+              return `-${id}`;
+            }
+            return id;
+          });
         if (ids.length === 0) {
           await msg.edit({ text: "❌ 无效的聊天ID", parseMode: "html" });
           return;
