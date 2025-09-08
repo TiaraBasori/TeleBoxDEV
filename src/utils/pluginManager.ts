@@ -91,6 +91,10 @@ function listCommands(): string[] {
 function getCommandFromMessage(msg: Api.Message | string): string | null {
   let prefixes = getPrefixes();
   const text = typeof msg === "string" ? msg : msg.message;
+  // 如果发送的是 `!h`
+  // console.log(msg?.message); // 这里是 !h
+  // console.log(msg?.text); // 这里是 `!h`
+  // 目前是认为可以执行
   if (!prefixes.some((p) => text.startsWith(p))) return null;
   const [cmd] = text.slice(1).split(" ");
   if (!cmd) return null;

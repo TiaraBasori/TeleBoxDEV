@@ -338,6 +338,7 @@ class surePlugin extends Plugin {
 
   listenMessageHandler?: ((msg: Api.Message) => Promise<void>) | undefined =
     async (msg) => {
+      if (msg.fwdFrom) return;
       const uid = extractId(msg.fromId as any);
       const cid = extractId(msg.peerId as any);
       if (!uid || !cid) return;
