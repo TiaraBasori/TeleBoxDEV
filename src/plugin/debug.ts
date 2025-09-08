@@ -73,6 +73,10 @@ class DebugPlugin extends Plugin {
       const txt = JSON.stringify(entity, null, 2);
       console.log(txt);
 
+      // if ((entity as any)?.sender) {
+      //   console.log("sender", JSON.stringify((entity as any)?.sender, null, 2));
+      // }
+
       try {
         await msg.edit({
           text: `<blockquote expandable>${txt}</blockquote>`,
@@ -111,6 +115,10 @@ class DebugPlugin extends Plugin {
         return;
       }
       const txt = JSON.stringify(reply, null, 2);
+      console.log(txt);
+      // if (reply.media) {
+      //   console.log("media", JSON.stringify(reply.media, null, 2));
+      // }
 
       try {
         await msg.edit({
@@ -150,11 +158,13 @@ class DebugPlugin extends Plugin {
         return;
       }
       const txt = JSON.stringify(reply, null, 2);
+      console.log(txt);
 
       await (trigger || msg).reply({
         message: reply,
         formattingEntities: reply.entities,
       });
+      await msg.delete();
     },
   };
 }
