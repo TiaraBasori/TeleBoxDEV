@@ -59,7 +59,7 @@ function htmlEscape(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
-const fn = async (msg) => {
+const fn = async (msg: Api.Message) => {
   console.log("SendLog plugin triggered");
 
   const parts = msg.message.trim().split(/\s+/);
