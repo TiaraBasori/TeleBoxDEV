@@ -120,12 +120,14 @@ async function installAllPlugins(msg: Api.Message) {
       const progress = Math.round(((i + 1) / totalPlugins) * 100);
       const progressBar = generateProgressBar(progress);
       try {
-        await msg.edit({
-          text: `📦 正在安装插件: <code>${plugin}</code>\n\n${progressBar}\n🔄 进度: ${
-            i + 1
-          }/${totalPlugins} (${progress}%)\n✅ 成功: ${installedCount}\n❌ 失败: ${failedCount}`,
-          parseMode: "html",
-        });
+        if ([0, plugins.length - 1].includes(i) || i % 2 === 0) {
+          await msg.edit({
+            text: `📦 正在安装插件: <code>${plugin}</code>\n\n${progressBar}\n🔄 进度: ${
+              i + 1
+            }/${totalPlugins} (${progress}%)\n✅ 成功: ${installedCount}\n❌ 失败: ${failedCount}`,
+            parseMode: "html",
+          });
+        }
 
         const pluginData = res.data[plugin];
         if (!pluginData || !pluginData.url) {
@@ -600,12 +602,14 @@ async function updateAllPlugins(msg: Api.Message) {
       const progressBar = generateProgressBar(progress);
 
       try {
-        await msg.edit({
-          text: `📦 正在更新插件: <code>${pluginName}</code>\n\n${progressBar}\n🔄 进度: ${
-            i + 1
-          }/${totalPlugins} (${progress}%)\n✅ 成功: ${updatedCount}\n⏭️ 跳过: ${skipCount}\n❌ 失败: ${failedCount}`,
-          parseMode: "html",
-        });
+        if ([0, dbPlugins.length - 1].includes(i) || i % 2 === 0) {
+          await msg.edit({
+            text: `📦 正在更新插件: <code>${pluginName}</code>\n\n${progressBar}\n🔄 进度: ${
+              i + 1
+            }/${totalPlugins} (${progress}%)\n✅ 成功: ${updatedCount}\n⏭️ 跳过: ${skipCount}\n❌ 失败: ${failedCount}`,
+            parseMode: "html",
+          });
+        }
 
         if (!pluginRecord.url) {
           skipCount++;
