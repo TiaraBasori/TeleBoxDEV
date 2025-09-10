@@ -704,15 +704,15 @@ async function updateAllPlugins(msg: Api.Message) {
 }
 
 class TpmPlugin extends Plugin {
-  description: string = `显示远程插件列表: <code>${mainPrefix}tpm search</code>
+  description: string = `显示远程插件列表: <code>${mainPrefix}tpm search</code>, <code>${mainPrefix}tpm s</code>
 安装远程插件: <code>${mainPrefix}tpm install name</code>, <code>${mainPrefix}tpm i name</code>
 从 Telegram 文件安装插件: 对某个文件回复 <code>${mainPrefix}tpm install</code>
 一键安装所有远程插件: <code>${mainPrefix}tpm i all</code>
 卸载插件: <code>${mainPrefix}tpm remove name</code>, <code>${mainPrefix}tpm rm name</code>, <code>${mainPrefix}tpm un name</code>, <code>${mainPrefix}tpm uninstall name</code>
-一键更新所有已安装的远程插件: <code>${mainPrefix}tpm update</code>
+一键更新所有已安装的远程插件: <code>${mainPrefix}tpm update</code>, <code>${mainPrefix}tpm ua</code>
 查看已安装记录精简版: <code>${mainPrefix}tpm list</code>, <code>${mainPrefix}tpm ls</code>
 查看已安装记录详细版: <code>${mainPrefix}tpm list -v</code>, <code>${mainPrefix}tpm ls -v</code>, <code>${mainPrefix}tpm lv</code>
-上传插件: <code>${mainPrefix}tpm upload name</code>
+上传插件: <code>${mainPrefix}tpm upload name</code>, <code>${mainPrefix}tpm ul name</code>
 `;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     tpm: async (msg) => {
@@ -732,18 +732,16 @@ class TpmPlugin extends Plugin {
         cmd === "rm"
       ) {
         await uninstallPlugin(args[1], msg);
-      } else if (cmd == "upload") {
+      } else if (cmd == "upload" || cmd == "ul") {
         await uploadPlugin(args, msg);
-      } else if (cmd === "search") {
+      } else if (cmd === "search" || cmd === "s") {
         await search(msg);
       } else if (cmd === "list" || cmd === "ls" || cmd === "lv") {
         await showPluginRecords(
           msg,
           ["-v", "--verbose"].includes(args[1]) || cmd === "lv"
         );
-      } else if (cmd === "update") {
-        await updateAllPlugins(msg);
-      } else if (cmd === "updateAll" || cmd === "ua") {
+      } else if (cmd === "update" || cmd === "updateAll" || cmd === "ua") {
         await updateAllPlugins(msg);
       }
     },
