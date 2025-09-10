@@ -2,20 +2,34 @@ import { Plugin } from "@utils/pluginBase";
 import { AliasDB } from "@utils/aliasDB";
 import { Api } from "telegram";
 import { loadPlugins } from "@utils/pluginManager";
-import { getPrefixes } from "@utils/pluginManager";
+import { getPrefixes, getPluginEntry } from "@utils/pluginManager";
+import { sleep } from "telegram/Helpers";
 
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
 
 async function setAlias(args: string[], msg: Api.Message) {
+  const final = args[1];
+  const original = args[2];
+  const pluginEntry = getPluginEntry(original);
+  if (!pluginEntry) {
+    await msg.edit({ text: `没找到${original}该原始命令，不保存该重定向` });
+    await sleep(2000);
+    await msg.delete();
+    return;
+  }
+  if (pluginEntry?.original) {
+    await msg.edit({ text: "不应该对重定向的命令再次重定向" });
+    await sleep(2000);
+    await msg.delete();
+    return;
+  }
   const db = new AliasDB();
-  const original = args[1];
-  const final = args[2];
-  db.set(original, final);
+  db.set(final, original);
   db.close();
   loadPlugins();
   await msg.edit({
-    text: `插件命令重命名成功，${original} -> ${final}`,
+    text: `插件命令重命名成功，${final} -> ${original}`,
   });
 }
 
