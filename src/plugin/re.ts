@@ -41,7 +41,7 @@ class RePlugin extends Plugin {
             const fromPeer = await replied!.getInputChat();
             const ids = messages.map((m) => m.id);
             const topMsgId =
-              msg.replyTo?.replyToTopId || replied?.replyTo?.replyToTopId;
+              replied?.replyTo?.replyToTopId || replied?.replyTo?.replyToMsgId;
 
             await msg.client?.invoke(
               new Api.messages.ForwardMessages({
