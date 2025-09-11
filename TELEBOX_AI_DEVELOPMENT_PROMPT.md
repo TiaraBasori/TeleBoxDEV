@@ -43,7 +43,6 @@ import { unbanUser, banUser, kickUser, getBannedUsers, batchUnbanUsers } from "@
 import { cronManager } from "@utils/cronManager";
 import { conversation } from "@utils/conversation";
 import { reviveEntities } from "@utils/tlRevive";
-import { npm_install } from "@utils/npm_install";
 import { apiConfig } from "@utils/apiConfig";
 import { loginManager } from "@utils/loginManager";
 ```
@@ -89,12 +88,15 @@ import { pinyin } from "pinyin-pro";
 // 翻译
 import translate from "@vitalets/google-translate-api";
 
+// HTML解析
+import * as cheerio from "cheerio";
+
 // YouTube
 import { Innertube } from "youtubei.js";
 import ytdl from "@distube/ytdl-core";
 ```
 
-### 🔧 必需工具函数
+### 必需工具函数
 
 ```typescript
 // HTML转义（每个插件必须实现）
@@ -139,22 +141,92 @@ function formatDate(date: Date): string {
   return date.toLocaleString("zh-CN", { timeZone: CN_TIME_ZONE });
 }
 ```
+
 ## 核心API签名
 
-### Plugin 基类
+### Plugin 基类（实际实现）
 
 ```typescript
 abstract class Plugin {
-  description?: string;
-  cmdHandlers?: { [key: string]: (msg: Api.Message) => Promise<void> };
+  // 必需属性（abstract） - 必须实现，否则插件无法加载
+  abstract description: string | ((...args: any[]) => string | void) | ((...args: any[]) => Promise<string | void>);
+  abstract cmdHandlers: Record<string, (msg: Api.Message, trigger?: Api.Message) => Promise<void>>;
+  
+  // 可选属性
   listenMessageHandler?: (msg: Api.Message) => Promise<void>;
-  cronTasks?: { [key: string]: { schedule: string; handler: () => Promise<void> } };
-  onInit?(): Promise<void>;
-  onDestroy?(): Promise<void>;
+  eventHandlers?: Array<{ event?: any; handler: (event: any) => Promise<void> }>;
+  cronTasks?: Record<string, { cron: string; description: string; handler: (client: TelegramClient) => Promise<void> }>;
 }
+
+// ⚠️ 重要说明：
+// 1. description 和 cmdHandlers 是 abstract，必须在子类中实现
+// 2. cmdHandlers 支持可选的 trigger 参数，用于处理触发消息
+// 3. eventHandlers 是新增的扩展功能，用于处理 Telegram 事件
 ```
 
 ### Message API
+
+#### ⚠️ Telegram 消息限制
+
+**每条消息最大 4096 字符：**
+- 超过限制会抛出 `MESSAGE_TOO_LONG` 错误
+- 需要分割长消息或使用文件发送
+- HTML 标签也计入字符数
+
+```typescript
+// 消息长度检查和分割
+const MAX_MESSAGE_LENGTH = 4096;
+
+function splitMessage(text: string): string[] {
+  if (text.length <= MAX_MESSAGE_LENGTH) {
+    return [text];
+  }
+  
+  const parts: string[] = [];
+  let currentPart = "";
+  const lines = text.split("\n");
+  
+  for (const line of lines) {
+    if (currentPart.length + line.length + 1 > MAX_MESSAGE_LENGTH) {
+      parts.push(currentPart);
+      currentPart = line;
+    } else {
+      currentPart += (currentPart ? "\n" : "") + line;
+    }
+  }
+  
+  if (currentPart) {
+    parts.push(currentPart);
+  }
+  
+  return parts;
+}
+
+// 发送长消息
+async function sendLongMessage(msg: Api.Message, text: string) {
+  const parts = splitMessage(text);
+  
+  if (parts.length === 1) {
+    await msg.edit({ text: parts[0], parseMode: "html" });
+  } else {
+    // 编辑第一部分
+    await msg.edit({ 
+      text: parts[0] + "\n\n📄 (1/" + parts.length + ")", 
+      parseMode: "html" 
+    });
+    
+    // 发送剩余部分
+    for (let i = 1; i < parts.length; i++) {
+      await msg.reply({ 
+        message: parts[i] + "\n\n📄 (" + (i + 1) + "/" + parts.length + ")",
+        parseMode: "html" 
+      });
+    }
+  }
+}
+```
+
+#### Message 接口定义
 
 ```typescript
 interface Api.Message {
@@ -180,18 +252,73 @@ interface Api.Message {
 
 ### 数据库 API
 
+#### ⚠️ 数据库使用优先级
+
+**优先使用 lowdb，特别是配置和Cookie类数据：**
+- lowdb 自动保存，简单易用
+- 适合配置、Cookie、用户偏好等数据
+- 支持自动持久化，无需手动管理事务
+
 ```typescript
-// SQLite
+// ✅ 推荐：使用 lowdb 存储配置和Cookie
+import { JSONFilePreset } from "lowdb/node";
+import path from "path";
+
+interface ConfigData {
+  cookies: Record<string, string>;
+  apiKeys: Record<string, string>;
+  settings: Record<string, any>;
+}
+
+// 初始化数据库
+const dbPath = path.join(process.cwd(), "assets", "plugin_config.json");
+const defaultData: ConfigData = {
+  cookies: {},
+  apiKeys: {},
+  settings: {}
+};
+
+const db = await JSONFilePreset<ConfigData>(dbPath, defaultData);
+
+// 保存Cookie（自动持久化）
+db.data.cookies["youtube"] = "cookie_value";
+await db.write(); // 自动保存到文件
+
+// 读取Cookie
+const cookie = db.data.cookies["youtube"];
+
+// 完整的Cookie管理示例
+class CookieManager {
+  private db: any;
+  
+  async init() {
+    this.db = await JSONFilePreset<ConfigData>(dbPath, defaultData);
+  }
+  
+  async setCookie(key: string, value: string) {
+    this.db.data.cookies[key] = value;
+    await this.db.write(); // 自动保存
+  }
+  
+  getCookie(key: string): string | undefined {
+    return this.db.data.cookies[key];
+  }
+  
+  async clearCookie(key: string) {
+    delete this.db.data.cookies[key];
+    await this.db.write(); // 自动保存
+  }
+}
+```
+
+#### SQLite（用于大量数据或复杂查询）
+
+```typescript
+// 仅在需要复杂查询或大量数据时使用
 const db = new Database(dbPath);
 db.prepare(sql: string): Statement;
 db.exec(sql: string): void;
 db.transaction(fn: Function): Function;
-
-// lowdb
-const db = await JSONFilePreset<T>(path, defaultData);
-await db.read();
-await db.write();
-db.data; // 访问数据
 
 // 内置数据库
 const aliasDB = new AliasDB();
@@ -314,7 +441,18 @@ if (args[1] && (args[1].toLowerCase() === "help" || args[1].toLowerCase() === "h
 
 ### 完整的参数解析示例
 ```typescript
+// 必须定义 help_text
+const help_text = `📋 <b>示例插件</b>
+
+<b>命令：</b>
+• <code>.example query</code> - 查询数据
+• <code>.example process</code> - 处理数据
+• <code>.example help</code> - 显示帮助`;
+
 class ExamplePlugin extends Plugin {
+  // 必须在 description 中引用 help_text
+  description: string = `示例插件\n\n${help_text}`;
+  
   cmdHandlers = {
     example: async (msg: Api.Message) => {
       const client = await getGlobalClient();
@@ -366,20 +504,9 @@ class ExamplePlugin extends Plugin {
 
         // 处理 help 在后的情况：.example [subcommand] help
         if (args[1] && (args[1].toLowerCase() === "help" || args[1].toLowerCase() === "h")) {
-          // 根据 sub 显示对应子命令的帮助
-          if (sub === "query") {
-            await msg.edit({ 
-              text: `📖 <b>查询命令帮助</b>\n\n<code>${mainPrefix}example query &lt;关键词&gt;</code> - 查询数据`,
-              parseMode: "html" 
-            });
-          } else if (sub === "process") {
-            await msg.edit({ 
-              text: `📖 <b>处理命令帮助</b>\n\n<code>${mainPrefix}example process &lt;数据&gt;</code> - 处理数据`,
-              parseMode: "html" 
-            });
-          } else {
-            await msg.edit({ text: help_text, parseMode: "html" });
-          }
+          // 显示当前子命令的帮助
+          const subCmd = sub;
+          // 根据 subCmd 显示对应的帮助信息...
           return;
         }
 
@@ -532,8 +659,6 @@ async function handleFloodWait<T>(operation: () => Promise<T>): Promise<T> {
 }
 ```
 
-
-
 ### 封禁管理工具
 ```typescript
 // 解封用户 - 移除所有限制
@@ -680,11 +805,87 @@ function shuffleArray<T>(array: T[]): T[] {
 
 ### 帮助系统设计原则
 
-1. **双向帮助支持**
+#### 帮助文本定义要求
+
+**所有插件必须定义 `help_text` 常量，并在 `description` 中引用：**
+
+```typescript
+// ✅ 正确：定义 help_text 常量
+const help_text = `📝 <b>插件名称</b>
+
+<b>命令格式：</b>
+<code>.cmd [子命令] [参数]</code>
+
+<b>可用命令：</b>
+• <code>.cmd sub1</code> - 子命令1说明
+• <code>.cmd sub2</code> - 子命令2说明
+• <code>.cmd help</code> - 显示帮助
+
+<b>示例：</b>
+<code>.cmd sub1### ✅ 必须遵循（强制要求）
+- [ ] **实现 description 和 cmdHandlers**（abstract 属性，必需）
+- [ ] **定义 `const help_text` 常量并在 description 中引用**
+  - 格式：`const help_text = "帮助内容";`
+  - 引用：`description: string = \`插件简介\\n\\n${help_text}\`;`
+- [ ] **所有用户输入必须HTML转义**（安全红线，不可妥协）
+- [ ] **优先使用 lowdb 存储配置和Cookie**（自动保存，无需手动管理）
+- [ ] **注意 Telegram 消息长度限制 4096 字符**（超长需分割发送）
+- [ ] 明确区分独立子指令和附属子指令（别名）   if (!args[0]) {
+        await msg.edit({
+          text: help_text,
+          parseMode: "html"
+        });
+      }
+{{ ... }}
+    }
+  };
+}
+```
+
+#### 指令类型区分
+
+1. **完全独立的子指令**（如 aban.ts）
+   - 每个子命令是独立的处理函数
+   - 在 `cmdHandlers` 中注册为独立的键值对
+   - 直接作为主命令使用，无需主命令前缀
+   - 示例：`kick`、`ban`、`unban`、`mute` 等都是独立命令
+   ```typescript
+   cmdHandlers = {
+     kick: handleKickCommand,
+     ban: handleBanCommand,
+     unban: handleUnbanCommand,
+     mute: handleMuteCommand
+   }
+   // 使用方式：.kick @user、.ban @user、.unban @user
+   ```
+
+2. **附属子指令（别名）**
+   - 作为主命令的参数，不是独立命令
+   - 在单个处理函数内部通过参数解析区分
+   - 必须配合主命令使用
+   - 帮助文档中子命令要带主命令前缀，方便复制
+   - 示例：`music` 插件的子命令
+   ```typescript
+   cmdHandlers = {
+     music: async (msg) => {
+       const sub = args[0]; // search、cookie、help 等
+       switch(sub) {
+         case 'search': // 处理搜索
+         case 'cookie': // 处理cookie
+         case 'help': // 显示帮助
+       }
+     }
+   }
+   // 使用方式：.music search 歌名、.music cookie set、.music help
+   ```
+
+3. **双向帮助支持**
+   - 必须定义 `const help_text` 变量
+   - 必须在 `description` 中使用 `${help_text}`
    - 支持 `.cmd help` 显示总帮助
    - 支持 `.cmd help subcommand` 显示子命令帮助
    - 支持 `.cmd subcommand help` 显示子命令帮助
-   - 无参数时显示错误提示，不自动显示帮助
+   - 无参数时可以显示 help_text 或错误提示
 
 2. **渐进式状态反馈**
    ```typescript
@@ -698,133 +899,255 @@ function shuffleArray<T>(array: T[]): T[] {
    - 所有用户输入必须经过 `htmlEscape()` 处理
    - 提供有用的错误恢复建议
 
-## 结束
+### 指令注册示例对比
+
+#### 独立子指令模式（推荐用于功能独立的命令）
 ```typescript
-// 渐进式信息展示
-await msg.edit({ text: "🔄 初始化..." });
-await msg.edit({ text: "🔍 搜索中..." });
-await msg.edit({ text: "✅ 完成!" });
+// aban.ts 风格 - 每个命令都是独立的
+class BanPlugin extends Plugin {
+  cmdHandlers = {
+    kick: async (msg) => { /* 踢人逻辑 */ },
+    ban: async (msg) => { /* 封禁逻辑 */ },
+    unban: async (msg) => { /* 解封逻辑 */ },
+    mute: async (msg) => { /* 禁言逻辑 */ },
+    sb: async (msg) => { /* 批量封禁逻辑 */ }
+  }
+}
+// 用户使用：.kick @user、.ban @user、.unban @user
 ```
 
-### 3. API限制处理
+#### 附属子指令模式（推荐用于功能相关的命令组）
 ```typescript
-async function handleFloodWait<T>(operation: () => Promise<T>): Promise<T> {
-  try {
-    return await operation();
-  } catch (error: any) {
-    if (error.message?.includes("FLOOD_WAIT")) {
-      const waitTime = parseInt(error.message.match(/\d+/)?.[0] || "60");
-      await sleep((waitTime + 1) * 1000);
-      return await operation();
+// music.ts 风格 - 所有子命令共享一个处理函数
+class MusicPlugin extends Plugin {
+  cmdHandlers = {
+    music: async (msg) => {
+      const [sub, ...args] = msg.message.split(' ').slice(1);
+      switch(sub) {
+        case 'search': await this.handleSearch(args);
+        case 'cookie': await this.handleCookie(args);
+        case 'help': await this.showHelp();
+      }
     }
-    throw error;
+  }
+}
+// 用户使用：.music search 歌名、.music cookie set、.music help
+```
+
+#### 3. 混合模式示例 - encode.ts（编码工具）
+```typescript
+class EncodePlugin extends Plugin {
+  cmdHandlers = {
+    // b64 和 url 是独立命令
+    b64: async (msg) => {
+      const [action, ...text] = parseArgs(msg.message);
+      // encode/decode 是 b64 的附属子指令
+      if (action === 'encode') await this.b64Encode(text);
+      if (action === 'decode') await this.b64Decode(text);
+    },
+    
+    url: async (msg) => {
+      const [action, ...text] = parseArgs(msg.message);
+      // encode/decode 是 url 的附属子指令
+      if (action === 'encode') await this.urlEncode(text);
+      if (action === 'decode') await this.urlDecode(text);
+    }
+  }
+}
+
+// 用户使用
+// .b64 encode 你好世界
+// .b64 decode SGVsbG8gV29ybGQ=
+// .url encode https://example.com?q=你好
+```
+
+### 实际插件示例对比
+
+#### 1. 独立子指令插件示例 - aban.ts（封禁管理）
+```typescript
+class AbanPlugin extends Plugin {
+  cmdHandlers = {
+    // 每个命令都是独立注册的
+    kick: handleKickCommand,     // .kick @user
+    ban: handleBanCommand,        // .ban @user  
+    unban: handleUnbanCommand,    // .unban @user
+    mute: handleMuteCommand,      // .mute @user 60
+    unmute: handleUnmuteCommand,  // .unmute @user
+    sb: handleSuperBanCommand,    // .sb @user
+    unsb: handleUnSuperBan,       // .unsb @user
+    refresh: handleRefreshCommand // .refresh
+  }
+}
+
+// 用户直接使用每个命令
+// .kick @spammer
+// .ban @advertiser 广告
+// .mute @flooder 30
+```
+
+#### 2. 附属子指令插件示例 - music.ts（音乐下载）
+```typescript
+class MusicPlugin extends Plugin {
+  cmdHandlers = {
+    music: async (msg) => {
+      const [sub, ...args] = parseArgs(msg.message);
+      
+      // 所有子命令都在这个函数内处理
+      switch(sub) {
+        case 'search':
+        case 's':
+          await this.searchMusic(args.join(' '));
+          break;
+          
+        case 'cookie':
+          const action = args[0];
+          if (action === 'set') await this.setCookie(args.slice(1));
+          if (action === 'get') await this.getCookie();
+          if (action === 'clear') await this.clearCookie();
+          break;
+          
+        case 'help':
+        case 'h':
+          await this.showHelp();
+          break;
+          
+        default:
+          // 默认行为：直接搜索
+          await this.searchMusic(msg.message.slice(6));
+      }
+    }
+  }
+}
+
+// 用户使用主命令 + 子命令
+// .music search 周杰伦 晴天
+// .music cookie set [cookie内容]
+// .music help
+```
+
+#### 3. 混合模式示例 - encode.ts（编码工具）
+```typescript
+class EncodePlugin extends Plugin {
+  cmdHandlers = {
+    // b64 和 url 是独立命令
+    b64: async (msg) => {
+      const [action, ...text] = parseArgs(msg.message);
+      // encode/decode 是 b64 的附属子指令
+      if (action === 'encode') await this.b64Encode(text);
+      if (action === 'decode') await this.b64Decode(text);
+    },
+    
+    url: async (msg) => {
+      const [action, ...text] = parseArgs(msg.message);
+      // encode/decode 是 url 的附属子指令
+      if (action === 'encode') await this.urlEncode(text);
+      if (action === 'decode') await this.urlDecode(text);
+    }
+  }
+}
+
+// 用户使用
+// .b64 encode 你好世界
+// .b64 decode SGVsbG8gV29ybGQ=
+// .url encode https://example.com?q=你好
+```
+
+### 选择指南
+
+#### 何时使用独立子指令？
+- ✅ 每个命令功能完全独立
+- ✅ 命令之间没有共享状态或配置
+- ✅ 用户习惯直接使用短命令
+- ✅ 命令数量较少（通常 < 10个）
+
+#### 何时使用附属子指令？
+- ✅ 命令组功能相关，共享配置或状态
+- ✅ 需要统一的参数解析逻辑
+- ✅ 子命令较多或可能扩展
+- ✅ 需要默认行为（无子命令时）
+
+### 使用示例
+```
+.b64 encode Hello World
+.b64 decode SGVsbG8gV29ybGQ=
+.url encode 你好世界
+.url decode %E4%BD%A0%E5%A5%BD%E4%B8%96%E7%95%8C
+.b64 help
+.url help
+```
+
+### 常见错误示例
+
+#### ❌ 错误：混淆指令类型
+```typescript
+// 错误：试图将附属子指令注册为独立命令
+class WrongPlugin extends Plugin {
+  cmdHandlers = {
+    music: handleMusic,
+    search: handleSearch,  // ❌ search 应该是 music 的子命令
+    cookie: handleCookie   // ❌ cookie 应该是 music 的子命令
   }
 }
 ```
 
----
-
-## 🚀 标准插件模板
-
+#### ✅ 正确：保持指令层级清晰
 ```typescript
-import { Plugin } from "@utils/pluginBase";
-import { getGlobalClient } from "@utils/globalClient";
-import { Api } from "telegram";
-
-// HTML转义工具
-const htmlEscape = (text: string): string => 
-  text.replace(/[&<>"']/g, m => ({ 
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', 
-    '"': '&quot;', "'": '&#x27;' 
-  }[m] || m));
-
-class TemplatePlugin extends Plugin {
-  description: string = `插件功能描述
-
-参数说明:
-• [参数1] - 参数说明
-• -f - 选项说明
-
-示例:
-• .cmd example - 示例用法`;
-  
-  cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
-    cmd: async (msg: Api.Message) => {
-      const client = await getGlobalClient();
-      if (!client) {
-        await msg.edit({ text: "❌ 客户端未初始化", parseMode: "html" });
-        return;
-      }
-
-      // 参数解析（严格按acron.ts模式）
-      const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
-      const parts = lines?.[0]?.split(/\s+/) || [];
-      const [, ...args] = parts;
-      const sub = (args[0] || "").toLowerCase();
-
-      try {
-        // 无参数时显示错误提示
-        if (!sub) {
-          await msg.edit({
-            text: `❌ <b>参数不足</b>\n\n💡 使用 <code>.cmd help</code> 查看帮助`,
-            parseMode: "html"
-          });
-          return;
-        }
-
-        // 明确请求帮助时才显示
-        if (sub === "help" || sub === "h") {
-          await msg.edit({
-            text: this.description,
-            parseMode: "html"
-          });
-          return;
-        }
-
-        // 业务逻辑
-        await msg.edit({ text: "🔄 处理中...", parseMode: "html" });
-        
-        const result = await this.processCommand(sub, args.slice(1));
-        
-        await msg.edit({ 
-          text: `✅ <b>操作完成</b>\n\n📊 结果: ${htmlEscape(result)}`,
-          parseMode: "html"
-        });
-        
-      } catch (error: any) {
-        console.error("[TemplatePlugin] 操作失败:", error);
-        await msg.edit({ 
-          text: `❌ <b>操作失败:</b> ${htmlEscape(error.message)}`,
-          parseMode: "html"
-        });
-      }
+class CorrectPlugin extends Plugin {
+  cmdHandlers = {
+    music: async (msg) => {
+      const [sub] = parseArgs(msg.message);
+      if (sub === 'search') { /* ... */ }
+      if (sub === 'cookie') { /* ... */ }
     }
-  };
-
-  private async processCommand(command: string, args: string[]): Promise<string> {
-    // 具体业务逻辑实现
-    return `处理命令: ${command}`;
   }
 }
-
-export default new TemplatePlugin();
 ```
 
----
+### 帮助文档最佳实践
 
-## 📋 开发检查清单
+#### 独立子指令的帮助文档
+```typescript
+// ✅ 必须定义 help_text 常量
+const help_text = `🛡️ <b>封禁管理插件</b>
 
-### ✅ 必须遵循
-- [ ] 使用acron.ts参数解析模式
-- [ ] 无参数时显示错误提示，不自动显示帮助
-- [ ] 明确请求help时才显示帮助文档
-- [ ] 所有用户输入必须HTML转义
-- [ ] 错误消息格式: `❌ <b>错误:</b> 详情`
-- [ ] 使用`parseMode: "html"`
-- [ ] 实现完整的错误处理
+<b>可用命令：</b>
+• <code>kick</code> - 踢出用户
+• <code>ban</code> - 封禁用户  
+• <code>unban</code> - 解封用户
+• <code>mute</code> - 禁言用户
 
-### ✅ 推荐实现
-- [ ] 渐进式用户反馈（如需要）
-- [ ] API限制处理
-- [ ] 日志记录
-- [ ] 权限验证（如需要）
+<b>使用方式：</b>
+每个命令可独立使用，例如：
+<code>.kick @user</code>
+<code>.ban @user 原因</code>`;
+
+class AbanPlugin extends Plugin {
+  // ✅ 必须在 description 中引用 help_text
+  description: string = `封禁管理插件\n\n${help_text}`;
+}
+```
+
+#### 附属子指令的帮助文档
+```typescript
+// ✅ 必须定义 help_text 常量
+const help_text = `🎵 <b>音乐下载插件</b>
+
+<b>命令格式：</b>
+<code>.music [子命令] [参数]</code>
+
+<b>子命令：</b>
+• <code>.music search</code> 或 <code>.music s</code> - 搜索音乐
+• <code>.music cookie set</code> - 设置Cookie
+• <code>.music cookie get</code> - 查看Cookie状态
+• <code>.music help</code> 或 <code>.music h</code> - 显示帮助
+
+<b>示例：</b>
+<code>.music search 周杰伦 晴天</code>
+<code>.music cookie set [内容]</code>
+<code>.music 歌名</code> - 直接搜索（默认行为）`;
+
+class MusicPlugin extends Plugin {
+  // ✅ 必须在 description 中引用 help_text
+  description: string = `音乐下载插件\n\n${help_text}`;
+}
+```
