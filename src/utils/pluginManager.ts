@@ -49,10 +49,10 @@ function dynamicRequireWithDeps(filePath: string) {
 async function setPlugins(basePath: string) {
   const files = fs.readdirSync(basePath).filter((file) => file.endsWith(".ts"));
   const aliasDB = new AliasDB();
-  for (const file of files) {
+  for await (const file of files) {
     const pluginPath = path.resolve(basePath, file);
     const mod = await dynamicRequireWithDeps(pluginPath);
-    if (!mod) return;
+    if (!mod) continue;
     const plugin = mod.default;
     if (plugin instanceof Plugin && isValidPlugin(plugin)) {
       validPlugins.push(plugin);
