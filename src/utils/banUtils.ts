@@ -123,11 +123,11 @@ export async function kickUser(
 }
 
 /**
- * 获取被封禁的用户列表（使用正确的 Kicked 过滤器）
+ * 获取被封禁的用户/频道/群组列表（使用正确的 Kicked 过滤器）
  * @param client TelegramClient 实例
  * @param channel 群组/频道实体
  * @param limit 获取数量限制
- * @returns 被封禁用户列表
+ * @returns 被封禁实体列表
  */
 export async function getBannedUsers(
   client: TelegramClient,
@@ -139,6 +139,8 @@ export async function getBannedUsers(
   username?: string;
   kickedBy?: number;
   kickedDate?: number;
+  type: 'user' | 'channel' | 'chat';
+  title?: string; // 频道/群组标题
 }>> {
   const bannedUsers: Array<{
     id: number;
@@ -146,6 +148,8 @@ export async function getBannedUsers(
     username?: string;
     kickedBy?: number;
     kickedDate?: number;
+    type: 'user' | 'channel' | 'chat';
+    title?: string;
   }> = [];
   
   try {
@@ -166,29 +170,53 @@ export async function getBannedUsers(
       for (const participant of result.participants) {
         if (participant instanceof Api.ChannelParticipantBanned) {
           // ChannelParticipantBanned 有 peer 和 kickedBy 属性
-          let userId: number | undefined;
+          let entityId: number | undefined;
+          let entityType: 'user' | 'channel' | 'chat' = 'user';
           const peer = participant.peer;
           
           if (peer instanceof Api.PeerUser) {
-            userId = Number(peer.userId);
+            entityId = Number(peer.userId);
+            entityType = 'user';
           } else if (peer instanceof Api.PeerChannel) {
-            userId = Number(peer.channelId);
+            entityId = Number(peer.channelId);
+            entityType = 'channel';
           } else if (peer instanceof Api.PeerChat) {
-            userId = Number(peer.chatId);
+            entityId = Number(peer.chatId);
+            entityType = 'chat';
           }
           
-          if (userId) {
+          if (entityId) {
+            // 查找用户信息
             const user = (result as any).users?.find((u: any) => 
-              Number(u.id) === userId
+              Number(u.id) === entityId
             );
             
-            if (user) {
+            // 查找频道/群组信息
+            const chat = (result as any).chats?.find((c: any) => 
+              Number(c.id) === entityId
+            );
+            
+            const entity = user || chat;
+            
+            if (entity) {
+              let displayName = "Unknown";
+              let title: string | undefined;
+              
+              if (entityType === 'user') {
+                displayName = entity.firstName || entity.username || "Unknown User";
+              } else {
+                displayName = entity.title || entity.username || "Unknown";
+                title = entity.title;
+              }
+              
               bannedUsers.push({
-                id: userId,
-                firstName: user.firstName || "Unknown",
-                username: user.username,
+                id: entityId,
+                firstName: displayName,
+                username: entity.username,
                 kickedBy: participant.kickedBy ? Number(participant.kickedBy) : undefined,
-                kickedDate: participant.date
+                kickedDate: participant.date,
+                type: entityType,
+                title: title
               });
             }
           }
@@ -205,7 +233,8 @@ export async function getBannedUsers(
               firstName: user.firstName || "Unknown",
               username: user.username,
               kickedBy: undefined,
-              kickedDate: undefined
+              kickedDate: undefined,
+              type: 'user'
             });
           }
         }
