@@ -1,6 +1,6 @@
 # TeleBox AI 开发规范
 
-> 📌 **版本**: 3.1 | **更新日期**: 2025-09-12 | **适用于**: TeleBox 高级插件开发
+> 📌 **版本**: 3.0 | **更新日期**: 2025-09-10 | **适用于**: TeleBox 高级插件开发
 
 ## 核心架构
 
@@ -91,9 +91,6 @@ import translate from "@vitalets/google-translate-api";
 // HTML解析
 import * as cheerio from "cheerio";
 
-// YouTube
-import { Innertube } from "youtubei.js";
-import ytdl from "@distube/ytdl-core";
 ```
 
 ### 必需工具函数
