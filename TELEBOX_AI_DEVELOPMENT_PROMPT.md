@@ -1,4 +1,7 @@
 # TeleBox AI 开发规范
+
+> 📌 **版本**: 3.0 | **更新日期**: 2025-09-10 | **适用于**: TeleBox 高级插件开发
+
 ## 核心架构
 
 ```
@@ -254,55 +257,101 @@ interface Api.Message {
 - 支持自动持久化，无需手动管理事务
 
 ```typescript
-// ✅ 推荐：使用 lowdb 存储配置和Cookie
+// ✅ 推荐：使用 lowdb 存储配置（扁平化结构）
 import { JSONFilePreset } from "lowdb/node";
-import path from "path";
+import * as path from "path";
+import { createDirectoryInAssets } from "@utils/pathHelpers";
 
-interface ConfigData {
-  cookies: Record<string, string>;
-  apiKeys: Record<string, string>;
-  settings: Record<string, any>;
-}
-
-// 初始化数据库
-const dbPath = path.join(process.cwd(), "assets", "plugin_config.json");
-const defaultData: ConfigData = {
-  cookies: {},
-  apiKeys: {},
-  settings: {}
+// 配置键定义
+const CONFIG_KEYS = {
+  API_KEY: "plugin_api_key",
+  COOKIE: "plugin_cookie", 
+  PROXY: "plugin_proxy",
+  BASE_URL: "plugin_base_url",
+  SETTING1: "plugin_setting1"
 };
 
-const db = await JSONFilePreset<ConfigData>(dbPath, defaultData);
+// 默认配置（扁平化结构）
+const DEFAULT_CONFIG: Record<string, string> = {
+  [CONFIG_KEYS.API_KEY]: "",
+  [CONFIG_KEYS.COOKIE]: "",
+  [CONFIG_KEYS.PROXY]: "",
+  [CONFIG_KEYS.BASE_URL]: "https://api.example.com",
+  [CONFIG_KEYS.SETTING1]: "default_value"
+};
 
-// 保存Cookie（自动持久化）
-db.data.cookies["youtube"] = "cookie_value";
-await db.write(); // 自动保存到文件
+// 配置管理器类
+class ConfigManager {
+  private static db: any = null;
+  private static initialized = false;
+  private static configPath: string;
 
-// 读取Cookie
-const cookie = db.data.cookies["youtube"];
+  private static async init(): Promise<void> {
+    if (this.initialized) return;
 
-// 完整的Cookie管理示例
-class CookieManager {
-  private db: any;
-  
-  async init() {
-    this.db = await JSONFilePreset<ConfigData>(dbPath, defaultData);
+    try {
+      // 使用插件专用目录
+      this.configPath = path.join(
+        createDirectoryInAssets("plugin_name"),
+        "plugin_config.json"
+      );
+
+      // 以扁平结构初始化
+      this.db = await JSONFilePreset<Record<string, any>>(
+        this.configPath,
+        { ...DEFAULT_CONFIG }
+      );
+      this.initialized = true;
+    } catch (error) {
+      console.error("[plugin] 初始化配置失败:", error);
+    }
   }
-  
-  async setCookie(key: string, value: string) {
-    this.db.data.cookies[key] = value;
-    await this.db.write(); // 自动保存
+
+  static async get(key: string, defaultValue?: string): Promise<string> {
+    await this.init();
+    if (!this.db) return defaultValue || DEFAULT_CONFIG[key] || "";
+
+    // 直接从顶级键读取
+    const value = this.db.data[key];
+    return value ?? defaultValue ?? DEFAULT_CONFIG[key] ?? "";
   }
-  
-  getCookie(key: string): string | undefined {
-    return this.db.data.cookies[key];
+
+  static async set(key: string, value: string): Promise<boolean> {
+    await this.init();
+    if (!this.db) return false;
+
+    try {
+      this.db.data[key] = value;
+      await this.db.write();
+      return true;
+    } catch (error) {
+      console.error(`[plugin] 设置配置失败 ${key}:`, error);
+      return false;
+    }
   }
-  
-  async clearCookie(key: string) {
-    delete this.db.data.cookies[key];
-    await this.db.write(); // 自动保存
+
+  static async remove(key: string): Promise<boolean> {
+    await this.init();
+    if (!this.db) return false;
+
+    try {
+      delete this.db.data[key];
+      await this.db.write();
+      return true;
+    } catch (error) {
+      console.error(`[plugin] 删除配置失败 ${key}:`, error);
+      return false;
+    }
   }
 }
+
+// 使用示例
+// 设置配置
+await ConfigManager.set(CONFIG_KEYS.API_KEY, "your_api_key");
+
+// 读取配置
+const apiKey = await ConfigManager.get(CONFIG_KEYS.API_KEY);
+const cookie = await ConfigManager.get(CONFIG_KEYS.COOKIE);
 ```
 
 #### SQLite（用于大量数据或复杂查询）
@@ -395,41 +444,55 @@ cronManager.listTasks(): string[];
 
 ### 参数解析标准
 ```typescript
-// acron.ts 模式
+// 标准参数解析模式（参考 music.ts）
 const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
 const parts = lines?.[0]?.split(/\s+/) || [];
 const [, ...args] = parts; // 跳过命令本身
 const sub = (args[0] || "").toLowerCase();
 
-// 无参数显示错误，不自动显示帮助
+// 无参数时的处理
 if (!sub) {
-  await msg.edit({ 
-    text: `❌ <b>参数不足</b>\n\n💡 使用 <code>${mainPrefix}cmd help</code> 查看帮助`,
-    parseMode: "html" 
+  await msg.edit({
+    text: `❌ <b>参数不足</b>\n\n💡 使用 <code>${mainPrefix}${pluginName} help</code> 查看帮助`,
+    parseMode: "html"
   });
   return;
 }
 
-// 双向帮助支持：help 可以在子命令前或后
+// 处理 help 在前的情况：.cmd help [subcommand]
 if (sub === "help" || sub === "h") {
-  // 处理 .cmd help 或 .cmd help subcommand
   if (args[1]) {
-    // 有子命令，显示子命令的帮助
+    // 显示特定子命令的帮助
     const subCmd = args[1].toLowerCase();
-    // 显示特定子命令的帮助...
+    await this.showSubCommandHelp(subCmd, msg);
   } else {
-    // 无子命令，显示总帮助
+    // 显示总帮助
     await msg.edit({ text: help_text, parseMode: "html" });
   }
   return;
 }
 
-// 检查子命令后是否跟着 help（支持 .cmd subcommand help）
+// 处理 help 在后的情况：.cmd [subcommand] help
 if (args[1] && (args[1].toLowerCase() === "help" || args[1].toLowerCase() === "h")) {
-  // 显示当前子命令的帮助
-  const subCmd = sub;
-  // 根据 subCmd 显示对应的帮助信息...
+  await this.showSubCommandHelp(sub, msg);
   return;
+}
+
+// 处理具体的子命令
+switch (sub) {
+  case "search":
+  case "s":
+    // 搜索逻辑
+    break;
+  case "config":
+    // 配置逻辑
+    break;
+  default:
+    // 未知命令或默认行为
+    await msg.edit({
+      text: `❌ <b>未知命令:</b> <code>${htmlEscape(sub)}</code>\n\n💡 使用 <code>${mainPrefix}${pluginName} help</code> 查看帮助`,
+      parseMode: "html"
+    });
 }
 ```
 
@@ -531,16 +594,44 @@ class ExamplePlugin extends Plugin {
 
 ### 错误处理标准
 ```typescript
+// 标准错误处理模式（参考 music.ts）
 try {
   // 业务逻辑
+  await msg.edit({ text: "🔄 处理中...", parseMode: "html" });
+  
+  // 执行具体操作
+  const result = await someOperation();
+  
+  await msg.edit({ 
+    text: `✅ <b>操作成功</b>\n\n${htmlEscape(result)}`,
+    parseMode: "html" 
+  });
+  
 } catch (error: any) {
+  console.error("[plugin] 操作失败:", error);
+  
+  // 处理特定错误类型
   if (error.message?.includes("FLOOD_WAIT")) {
     const waitTime = parseInt(error.message.match(/\d+/)?.[0] || "60");
-    await sleep((waitTime + 1) * 1000);
+    await msg.edit({
+      text: `⏳ <b>请求过于频繁</b>\n\n需要等待 ${waitTime} 秒后重试`,
+      parseMode: "html"
+    });
+    return;
   }
-  await msg.edit({ 
-    text: `❌ <b>错误:</b> ${htmlEscape(error.message)}`,
-    parseMode: "html" 
+  
+  if (error.message?.includes("MESSAGE_TOO_LONG")) {
+    await msg.edit({
+      text: "❌ <b>消息过长</b>\n\n请减少内容长度或使用文件发送",
+      parseMode: "html"
+    });
+    return;
+  }
+  
+  // 通用错误处理
+  await msg.edit({
+    text: `❌ <b>操作失败:</b> ${htmlEscape(error.message || "未知错误")}`,
+    parseMode: "html"
   });
 }
 ```
@@ -1123,25 +1214,69 @@ class AbanPlugin extends Plugin {
 
 #### 附属子指令的帮助文档
 ```typescript
-// ✅ 必须定义 help_text 常量
+// ✅ 必须定义 help_text 常量（参考 music.ts 实际实现）
 const help_text = `🎵 <b>音乐下载插件</b>
 
 <b>命令格式：</b>
-<code>.music [子命令] [参数]</code>
+<code>${mainPrefix}music [歌名] 或 ${mainPrefix}music [子命令] [参数]</code>
 
 <b>子命令：</b>
-• <code>.music search</code> 或 <code>.music s</code> - 搜索音乐
-• <code>.music cookie set</code> - 设置Cookie
-• <code>.music cookie get</code> - 查看Cookie状态
-• <code>.music help</code> 或 <code>.music h</code> - 显示帮助
+• <code>${mainPrefix}music search 歌名</code> - 搜索并下载音乐
+• <code>${mainPrefix}music cookie set [内容]</code> - 设置 YouTube Cookie
+• <code>${mainPrefix}music cookie get</code> - 查看当前 Cookie 状态
+• <code>${mainPrefix}music cookie clear</code> - 清除 Cookie
+• <code>${mainPrefix}music config</code> - 查看所有配置
+• <code>${mainPrefix}music help</code> - 显示此帮助
 
-<b>示例：</b>
-<code>.music search 周杰伦 晴天</code>
-<code>.music cookie set [内容]</code>
-<code>.music 歌名</code> - 直接搜索（默认行为）`;
+<b>配置命令：</b>
+• <code>${mainPrefix}music config apikey [密钥]</code> - 设置 Gemini API 密钥
+• <code>${mainPrefix}music config proxy [代理]</code> - 设置代理服务器
+• <code>${mainPrefix}music config quality [质量]</code> - 设置音频质量
+
+<b>使用示例：</b>
+<code>${mainPrefix}music 周杰伦 晴天</code> - 直接搜索
+<code>${mainPrefix}music search 林俊杰 江南</code> - 明确搜索`;
 
 class MusicPlugin extends Plugin {
   // ✅ 必须在 description 中引用 help_text
-  description: string = `音乐下载插件\n\n${help_text}`;
+  description: string | ((...args: any[]) => string | void) = `音乐下载插件\n\n${help_text}`;
+  
+  cmdHandlers = {
+    music: async (msg: Api.Message) => {
+      const client = await getGlobalClient();
+      if (!client) {
+        await msg.edit({ text: "❌ 客户端未初始化", parseMode: "html" });
+        return;
+      }
+
+      const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
+      const parts = lines?.[0]?.split(/\s+/) || [];
+      const [, ...args] = parts;
+      const sub = (args[0] || "").toLowerCase();
+
+      try {
+        // 无参数时显示帮助
+        if (!sub) {
+          await msg.edit({ text: help_text, parseMode: "html" });
+          return;
+        }
+
+        // 处理 help 命令
+        if (sub === "help" || sub === "h") {
+          await msg.edit({ text: help_text, parseMode: "html" });
+          return;
+        }
+
+        // 处理其他子命令...
+        
+      } catch (error: any) {
+        console.error("[music] 插件执行失败:", error);
+        await msg.edit({
+          text: `❌ <b>插件执行失败:</b> ${htmlEscape(error.message)}`,
+          parseMode: "html"
+        });
+      }
+    }
+  };
 }
 ```
