@@ -1,6 +1,6 @@
 {
   "name": "telebox",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "",
   "scripts": {
     "start": "tsx -r tsconfig-paths/register ./src/index.ts",
@@ -35,6 +35,7 @@
     "dayjs": "^1.11.18",
     "lodash": "^4.17.21",
     "lowdb": "^7.0.1",
+    "modern-gif": "^2.0.4",
     "opencc-js": "^1.0.5",
     "sharp": "^0.34.3",
     "telegram": "^2.26.22",

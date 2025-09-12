@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.3] --2025-09-12
+
+- 添加 modern-gif 依赖库，用于 eatgif 插件
+- hook 添加 Api.Message.deleteWithDelay，用于延迟删除消息
+
 ## [0.2.2] --2025-09-08
 
 - 移除 download 依赖库
