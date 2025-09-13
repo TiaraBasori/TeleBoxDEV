@@ -20,6 +20,19 @@ declare module "telegram" {
         delay: number,
         shouldThrowError?: boolean
       ): Promise<Api.messages.AffectedMessages[] | undefined>;
+
+      /**
+       * Api.Message.delete 的替代品，删除消息时捕捉错误，而不是导致进程结束
+       * @example
+       * ```ts
+       * await msg.safeDelete();
+       * ```
+       */
+      safeDelete({
+        revoke,
+      }?: {
+        revoke: boolean;
+      }): Promise<Api.messages.AffectedMessages[] | undefined>;
     }
   }
 }

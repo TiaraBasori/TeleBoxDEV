@@ -3,6 +3,7 @@
 ## [0.2.4] --2025-09-13
 
 - 修复 Api.Message.deleteWithDelay 没有类型提醒
+- hook 添加 Api.Message.safeDelet，用于安全删除消息，而不是遇到某些消息无法删除而退出进程
 
 ## [0.2.3] --2025-09-12
 

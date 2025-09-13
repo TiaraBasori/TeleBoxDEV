@@ -15,3 +15,13 @@ Api.Message.prototype.deleteWithDelay = async function (
     }
   }
 };
+
+Api.Message.prototype.safeDelete = async function (
+  { revoke }: { revoke: boolean } = { revoke: false }
+) {
+  try {
+    return this.delete({ revoke });
+  } catch (error) {
+    console.log("safeDelete catch error:", error);
+  }
+};
