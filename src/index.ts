@@ -1,7 +1,7 @@
 import { login } from "@utils/loginManager";
 import { loadPlugins } from "@utils/pluginManager";
 import { patchMsgEdit } from "hook/listen";
-import "./hook/message"
+import "./hook/patches/telegram.patch"
 
 // patchMsgEdit();
 

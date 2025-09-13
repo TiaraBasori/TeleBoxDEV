@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.2.4] --2025-09-13
+
+- 修复 Api.Message.deleteWithDelay 没有类型提醒
+
 ## [0.2.3] --2025-09-12
 
 - 添加 modern-gif 依赖库，用于 eatgif 插件
