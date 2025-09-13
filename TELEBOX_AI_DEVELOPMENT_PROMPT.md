@@ -448,8 +448,10 @@ const parts = lines?.[0]?.split(/\s+/) || [];
 const [, ...args] = parts; // 跳过命令本身
 const sub = (args[0] || "").toLowerCase();
 
-// 无参数时的处理
+// 无参数时的处理（根据插件功能自定义默认行为）
 if (!sub) {
+  // 示例：可以显示帮助、执行默认操作或提示参数不足
+  // 具体行为根据插件实际需求决定
   await msg.edit({
     text: `❌ <b>参数不足</b>\n\n💡 使用 <code>${mainPrefix}${pluginName} help</code> 查看帮助`,
     parseMode: "html"
@@ -1071,7 +1073,7 @@ switch(sub) {
 1. 定义帮助文本常量（推荐 `const help_text` 或 `const HELP_TEXT`）
 2. 在 `description` 中引用帮助文本（如 `${help_text}`）
 3. 支持 help 指令显示帮助
-4. 无参数时的合理默认行为
+4. 无参数时的合理默认行为（根据插件实际功能自定义，不强制要求显示帮助或报错）
 
 **实际项目中的命名约定：**
 - 推荐使用 `const help_text`（小写下划线）
@@ -1404,8 +1406,10 @@ class MusicPlugin extends Plugin {
       const sub = (args[0] || "").toLowerCase();
 
       try {
-        // 无参数时显示帮助
+        // 无参数时的处理（根据插件功能自定义默认行为）
         if (!sub) {
+          // 示例：可以显示帮助、执行默认操作或提示参数不足
+          // 具体行为根据插件实际需求决定
           await msg.edit({ text: help_text, parseMode: "html" });
           return;
         }
