@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-LGPL%202.1-blue.svg?style=for-the-badge)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue.svg?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Version](https://img.shields.io/badge/Version-0.1.3-orange.svg?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-0.2.2-orange.svg?style=for-the-badge)](CHANGELOG.md)
 
 **现代化 Telegram Bot 开发框架**
 
@@ -122,13 +122,40 @@ sudo 权限分配和用户管理
 </div>
 
 ```typescript
-// 🎨 优雅的插件接口设计
-interface Plugin {
-  command: string[]; // 🏷️ 命令列表
-  description?: string; // 📝 功能描述
-  cmdHandler: (msg: Api.Message) => Promise<void>; // ⚡ 命令处理器
-  listenMessageHandler?: (msg: Api.Message) => Promise<void>; // 👂 消息监听器
+// 🎨 现代化的插件抽象类设计
+abstract class Plugin {
+  // 📝 必需属性 - 插件描述（支持动态生成）
+  abstract description:
+    | string
+    | ((...args: any[]) => string | void)
+    | ((...args: any[]) => Promise<string | void>);
+    
+  // ⚡ 必需属性 - 命令处理器映射表
+  abstract cmdHandlers: Record<
+    string,
+    (msg: Api.Message, trigger?: Api.Message) => Promise<void>
+  >;
+  
+  // 👂 可选属性 - 消息监听器
+  listenMessageHandler?: (msg: Api.Message) => Promise<void>;
+  
+  // 🎯 可选属性 - 事件处理器
+  eventHandlers?: Array<{
+    event?: any;
+    handler: (event: any) => Promise<void>;
+  }>;
+  
+  // ⏰ 可选属性 - 定时任务
+  cronTasks?: Record<string, {
+    cron: string;
+    description: string;
+    handler: (client: TelegramClient) => Promise<void>;
+  }>;
 }
+
+// 💡 trigger 参数说明：
+// 用于 sudo 用户权限传递，如 eat 插件获取 sudo 用户头像
+// 示例：.sudo eat @target -> trigger 为 sudo 用户的消息
 ```
 
 <table>
