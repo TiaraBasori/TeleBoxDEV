@@ -913,62 +913,213 @@ const help_text = `📝 <b>插件名称</b>
 - [ ] **所有用户输入必须HTML转义**（安全红线，不可妥协）
 - [ ] **优先使用 lowdb 存储配置和Cookie**（自动保存，无需手动管理）
 - [ ] **注意 Telegram 消息长度限制 4096 字符**（超长需分割发送）
-- [ ] 明确区分独立子指令和附属子指令（别名）   if (!args[0]) {
-        await msg.edit({
-          text: help_text,
-          parseMode: "html"
-        });
-      }
-{{ ... }}
-    }
-  };
+- [ ] **明确区分指令架构模式**（详见指令架构设计章节）
+
+## 指令架构设计
+
+### 术语定义
+
+#### 1. 指令 (Command)
+在 `cmdHandlers` 中注册的顶级键，用户可以直接调用。
+```typescript
+cmdHandlers = {
+  kick: handleKick,    // "kick" 是一个指令
+  music: handleMusic   // "music" 是一个指令
 }
 ```
 
-#### 指令类型区分
+#### 2. 子指令 (Subcommand)
+指令内部通过参数解析处理的功能分支，不能独立调用。
+```typescript
+// .music search 歌名  <- "search" 是 music 指令的子指令
+// .music cookie set   <- "cookie" 是 music 指令的子指令
+```
 
-1. **完全独立的子指令**（如 aban.ts）
-   - 每个子命令是独立的处理函数
-   - 在 `cmdHandlers` 中注册为独立的键值对
-   - 直接作为主命令使用，无需主命令前缀
-   - 示例：`kick`、`ban`、`unban`、`mute` 等都是独立命令
-   ```typescript
-   cmdHandlers = {
-     kick: handleKickCommand,
-     ban: handleBanCommand,
-     unban: handleUnbanCommand,
-     mute: handleMuteCommand
-   }
-   // 使用方式：.kick @user、.ban @user、.unban @user
-   ```
+#### 3. 别名 (Alias)
+同一功能的不同调用方式，通常是简写形式。支持多个别名。
+```typescript
+// 单个别名
+case 'search':
+case 's':  // "s" 是 "search" 的别名
+  await this.handleSearch();
+  break;
 
-2. **附属子指令（别名）**
-   - 作为主命令的参数，不是独立命令
-   - 在单个处理函数内部通过参数解析区分
-   - 必须配合主命令使用
-   - 帮助文档中子命令要带主命令前缀，方便复制
-   - 示例：`music` 插件的子命令
-   ```typescript
-   cmdHandlers = {
-     music: async (msg) => {
-       const sub = args[0]; // search、cookie、help 等
-       switch(sub) {
-         case 'search': // 处理搜索
-         case 'cookie': // 处理cookie
-         case 'help': // 显示帮助
-       }
-     }
-   }
-   // 使用方式：.music search 歌名、.music cookie set、.music help
-   ```
+// 多个别名
+case 'download':
+case 'dl':     // 简写别名
+case 'd':      // 超短别名
+case '下载':    // 中文别名
+  await this.handleDownload();
+  break;
 
-3. **双向帮助支持**
-   - 必须定义 `const help_text` 变量
-   - 必须在 `description` 中使用 `${help_text}`
-   - 支持 `.cmd help` 显示总帮助
-   - 支持 `.cmd help subcommand` 显示子命令帮助
-   - 支持 `.cmd subcommand help` 显示子命令帮助
-   - 无参数时可以显示 help_text 或错误提示
+case 'configuration':
+case 'config':
+case 'cfg':
+case 'set':
+case '配置':
+  await this.handleConfig();
+  break;
+```
+
+### 指令架构模式
+
+#### 推荐模式：主从指令模式（默认选择）
+**适用场景：** 大多数插件的标准架构，功能相关，共享配置或状态
+
+```typescript
+// 单指令插件（支持多个别名）
+class SpeedtestPlugin extends Plugin {
+  cmdHandlers = {
+    speedtest: handleSpeedtest,  // 主指令
+    st: handleSpeedtest          // 别名
+  }
+}
+// 用户使用：.speedtest 或 .st
+
+// 主从指令插件
+class MusicPlugin extends Plugin {
+  cmdHandlers = {
+    music: async (msg) => {
+      const [sub, ...args] = parseArgs(msg.message);
+      switch(sub) {
+        case 'search':
+        case 's':  // 别名
+          await this.handleSearch(args);
+          break;
+        case 'cookie':
+          await this.handleCookie(args);
+          break;
+        case 'help':
+        case 'h':  // 别名
+          await this.showHelp();
+          break;
+        default:
+          // 默认行为：直接搜索
+          await this.handleSearch([sub, ...args]);
+      }
+    }
+  }
+}
+// 用户使用：.music search 歌名、.music cookie set、.music help
+```
+
+**特点：**
+- 大多数插件使用这种模式
+- 支持指令别名（如 speedtest/st）和子指令别名（如 search/s）
+- 便于功能扩展和配置管理
+- 统一的参数解析和错误处理
+
+#### 特殊模式：独立指令模式（需特别说明才使用）
+**适用场景：** 功能完全独立，用户明确要求使用短指令
+
+```typescript
+class BanPlugin extends Plugin {
+  cmdHandlers = {
+    kick: async (msg) => { /* 踢人逻辑 */ },
+    ban: async (msg) => { /* 封禁逻辑 */ },
+    unban: async (msg) => { /* 解封逻辑 */ },
+    mute: async (msg) => { /* 禁言逻辑 */ }
+  }
+}
+// 用户使用：.kick @user、.ban @user、.unban @user
+```
+
+**注意：** 仅在用户明确要求使用短指令时才采用此模式
+
+### 选择指南
+
+**默认选择：主从指令模式**
+- ✅ 适合 95% 的插件开发场景
+- ✅ 支持指令别名（如 speedtest/st）
+- ✅ 支持子指令别名（如 search/s、help/h）
+- ✅ 便于功能扩展和维护
+- ✅ 统一的错误处理和帮助系统
+
+**何时使用独立指令模式：**
+- 用户明确要求使用短指令（如 .kick、.ban）
+- 功能极其简单且不会扩展
+- 与现有系统保持兼容性
+
+### 别名设置示例
+
+#### 指令级别别名（推荐）
+```typescript
+class SpeedtestPlugin extends Plugin {
+  cmdHandlers = {
+    speedtest: handleSpeedtest,  // 主指令
+    st: handleSpeedtest,         // 简写别名
+    测速: handleSpeedtest        // 中文别名
+  }
+}
+```
+
+#### 子指令级别别名
+```typescript
+switch(sub) {
+  case 'download':
+  case 'dl':
+  case 'd':
+  case '下载':
+    await this.handleDownload();
+    break;
+}
+```
+
+### 帮助系统设计
+
+**所有插件都必须：**
+1. 定义帮助文本常量（推荐 `const help_text` 或 `const HELP_TEXT`）
+2. 在 `description` 中引用帮助文本（如 `${help_text}`）
+3. 支持 help 指令显示帮助
+4. 无参数时的合理默认行为
+
+**实际项目中的命名约定：**
+- 推荐使用 `const help_text`（小写下划线）
+- 也可使用 `const HELP_TEXT`（大写下划线）
+- 保持项目内命名一致即可
+
+#### 帮助文档中的格式处理
+
+**当帮助文档包含代码、命令或链接时，需要特殊处理：**
+
+```typescript
+// ❌ 错误：直接在 help_text 中使用代码和链接
+const help_text = `📝 <b>WARP 安装插件</b>
+
+<b>安装方法：</b>
+wget -N https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&
+bash menu.sh e
+
+<b>相关链接：</b>
+• 官网：https://example.com`;
+
+// ✅ 正确：使用 <pre> 标签包裹代码块和链接
+const help_text = `📝 <b>WARP 安装插件</b>
+
+<b>🚀 方案1 - WARP+ (推荐)：</b>
+<pre>wget -N https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&
+bash menu.sh e</pre>
+
+<b>🔧 方案2 - WireProxy：</b>
+<pre># 安装 WireProxy
+wget -N https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&
+bash menu.sh w
+
+# 配置代理 (WireProxy 默认端口 40000)
+.music set proxy socks5://127.0.0.1:40000</pre>
+
+<b>相关链接：</b>
+• 官网：<pre>https://example.com</pre>
+• <a href="https://docs.example.com">文档</a>`;
+```
+
+**格式处理规则：**
+- **代码块必须用 `<pre>` 标签包裹**，保持格式和防止自动解析
+- **多行命令用 `<pre>` 包裹**，保持换行和缩进
+- **裸链接用 `<pre>` 包裹**，防止 Telegram 自动解析
+- **可点击链接用 `<a href="">` 标签**
+- **长代码块可以分段**，每段用独立的 `<pre>` 标签
+- **注释和说明可以在 `<pre>` 外部**，用普通 HTML 格式
 
 2. **渐进式状态反馈**
    ```typescript
@@ -1046,11 +1197,11 @@ class EncodePlugin extends Plugin {
 
 ### 实际插件示例对比
 
-#### 1. 独立子指令插件示例 - aban.ts（封禁管理）
+#### 1. 独立指令模式示例 - aban.ts（封禁管理）
 ```typescript
 class AbanPlugin extends Plugin {
   cmdHandlers = {
-    // 每个命令都是独立注册的
+    // 每个指令都是独立注册的
     kick: handleKickCommand,     // .kick @user
     ban: handleBanCommand,        // .ban @user  
     unban: handleUnbanCommand,    // .unban @user
@@ -1062,23 +1213,23 @@ class AbanPlugin extends Plugin {
   }
 }
 
-// 用户直接使用每个命令
+// 用户直接使用每个指令
 // .kick @spammer
 // .ban @advertiser 广告
 // .mute @flooder 30
 ```
 
-#### 2. 附属子指令插件示例 - music.ts（音乐下载）
+#### 2. 主从指令模式示例 - music.ts（音乐下载）
 ```typescript
 class MusicPlugin extends Plugin {
   cmdHandlers = {
     music: async (msg) => {
       const [sub, ...args] = parseArgs(msg.message);
       
-      // 所有子命令都在这个函数内处理
+      // 所有子指令都在这个函数内处理
       switch(sub) {
         case 'search':
-        case 's':
+        case 's':  // 别名
           await this.searchMusic(args.join(' '));
           break;
           
@@ -1090,7 +1241,7 @@ class MusicPlugin extends Plugin {
           break;
           
         case 'help':
-        case 'h':
+        case 'h':  // 别名
           await this.showHelp();
           break;
           
@@ -1102,7 +1253,7 @@ class MusicPlugin extends Plugin {
   }
 }
 
-// 用户使用主命令 + 子命令
+// 用户使用主指令 + 子指令
 // .music search 周杰伦 晴天
 // .music cookie set [cookie内容]
 // .music help
@@ -1161,19 +1312,19 @@ class EncodePlugin extends Plugin {
 
 ### 常见错误示例
 
-#### ❌ 错误：混淆指令类型
+#### ❌ 错误：混淆指令架构模式
 ```typescript
-// 错误：试图将附属子指令注册为独立命令
+// 错误：试图将子指令注册为独立指令
 class WrongPlugin extends Plugin {
   cmdHandlers = {
     music: handleMusic,
-    search: handleSearch,  // ❌ search 应该是 music 的子命令
-    cookie: handleCookie   // ❌ cookie 应该是 music 的子命令
+    search: handleSearch,  // ❌ search 应该是 music 的子指令
+    cookie: handleCookie   // ❌ cookie 应该是 music 的子指令
   }
 }
 ```
 
-#### ✅ 正确：保持指令层级清晰
+#### ✅ 正确：保持架构模式一致
 ```typescript
 class CorrectPlugin extends Plugin {
   cmdHandlers = {
