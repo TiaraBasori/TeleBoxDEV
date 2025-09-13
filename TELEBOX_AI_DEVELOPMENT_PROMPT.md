@@ -76,9 +76,16 @@ import { JSONFilePreset } from "lowdb/node";
 // 文件系统
 import * as fs from "fs";
 import * as path from "path";
+import archiver from "archiver";
 
 // HTML解析
 import * as cheerio from "cheerio";
+
+// 媒体处理
+import { GifReader, GifWriter } from "modern-gif";
+
+// 中文处理
+import OpenCC from "opencc-js";
 
 // 动态导入（按需使用）
 // const translateModule = await import("@vitalets/google-translate-api");
