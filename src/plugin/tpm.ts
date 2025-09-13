@@ -289,7 +289,10 @@ async function installMultiplePlugins(pluginNames: string[], msg: Api.Message) {
             .toISOString()
             .replace(/[:.]/g, "-")
             .slice(0, -5);
-          const backupPath = path.join(cacheDir, `${pluginName}_${timestamp}.ts`);
+          const backupPath = path.join(
+            cacheDir,
+            `${pluginName}_${timestamp}.ts`
+          );
           fs.copyFileSync(filePath, backupPath);
           console.log(`[TPM] 旧插件已转移到缓存: ${backupPath}`);
         }
@@ -336,7 +339,7 @@ async function installMultiplePlugins(pluginNames: string[], msg: Api.Message) {
     // 生成结果消息
     const successBar = generateProgressBar(100);
     let resultMsg = `🎉 <b>批量安装完成!</b>\n\n${successBar}\n\n📊 <b>安装统计:</b>\n✅ 成功安装: ${installedCount}/${totalPlugins}\n❌ 安装失败: ${failedCount}/${totalPlugins}`;
-    
+
     // 添加未找到的插件列表
     if (notFoundPlugins.length > 0) {
       const notFoundList = notFoundPlugins.slice(0, 5).join("\n• ");
@@ -346,7 +349,7 @@ async function installMultiplePlugins(pluginNames: string[], msg: Api.Message) {
           : "";
       resultMsg += `\n\n🔍 <b>未找到的插件:</b>\n• ${notFoundList}${moreNotFound}`;
     }
-    
+
     // 添加其他失败的插件列表
     if (failedPlugins.length > 0) {
       const failedList = failedPlugins.slice(0, 5).join("\n• ");
@@ -356,7 +359,7 @@ async function installMultiplePlugins(pluginNames: string[], msg: Api.Message) {
           : "";
       resultMsg += `\n\n❌ <b>其他失败:</b>\n• ${failedList}${moreFailures}`;
     }
-    
+
     resultMsg += `\n\n🔄 插件已重新加载，可以开始使用!`;
 
     await msg.edit({ text: resultMsg, parseMode: "html" });
@@ -414,7 +417,7 @@ async function installPlugin(args: string[], msg: Api.Message) {
   } else {
     // 获取所有插件名称参数（从args[1]开始）
     const pluginNames = args.slice(1);
-    
+
     // 检查是否包含特殊命令
     if (pluginNames.length === 1 && pluginNames[0] === "all") {
       await installAllPlugins(msg);
@@ -453,7 +456,10 @@ async function uninstallPlugin(plugin: string, msg: Api.Message) {
   await loadPlugins();
 }
 
-async function uninstallMultiplePlugins(pluginNames: string[], msg: Api.Message) {
+async function uninstallMultiplePlugins(
+  pluginNames: string[],
+  msg: Api.Message
+) {
   if (!pluginNames || pluginNames.length === 0) {
     await msg.edit({ text: "请提供要卸载的插件名称" });
     return;
@@ -464,62 +470,79 @@ async function uninstallMultiplePlugins(pluginNames: string[], msg: Api.Message)
   const totalCount = pluginNames.length;
 
   // 初始消息
-  await msg.edit({ 
-    text: `开始卸载 ${totalCount} 个插件...\n${generateProgressBar(0)} 0/${totalCount}` 
+  await msg.edit({
+    text: `开始卸载 ${totalCount} 个插件...\n${generateProgressBar(
+      0
+    )} 0/${totalCount}`,
   });
 
   try {
     const db = await getDatabase();
-    
+
     for (const pluginName of pluginNames) {
       const trimmedName = pluginName.trim();
       if (!trimmedName) {
-        results.push({ name: pluginName, success: false, reason: "插件名称为空" });
+        results.push({
+          name: pluginName,
+          success: false,
+          reason: "插件名称为空",
+        });
         processedCount++;
         continue;
       }
 
       const pluginPath = path.join(PLUGIN_PATH, `${trimmedName}.ts`);
-      
+
       if (fs.existsSync(pluginPath)) {
         try {
           // 删除文件
           fs.unlinkSync(pluginPath);
-          
+
           // 从数据库中删除记录
           if (db.data[trimmedName]) {
             delete db.data[trimmedName];
             console.log(`[TPM] 已从数据库中删除插件记录: ${trimmedName}`);
           }
-          
+
           results.push({ name: trimmedName, success: true });
         } catch (error) {
           console.error(`[TPM] 卸载插件 ${trimmedName} 失败:`, error);
-          results.push({ 
-            name: trimmedName, 
-            success: false, 
-            reason: `删除失败: ${error instanceof Error ? error.message : String(error)}` 
+          results.push({
+            name: trimmedName,
+            success: false,
+            reason: `删除失败: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
           });
         }
       } else {
-        results.push({ name: trimmedName, success: false, reason: "插件不存在" });
+        results.push({
+          name: trimmedName,
+          success: false,
+          reason: "插件不存在",
+        });
       }
 
       processedCount++;
       const percentage = Math.round((processedCount / totalCount) * 100);
-      
+
       // 更新进度
-      await msg.edit({ 
-        text: `卸载插件中...\n${generateProgressBar(percentage)} ${processedCount}/${totalCount}\n当前: ${trimmedName}` 
+      await msg.edit({
+        text: `卸载插件中...\n${generateProgressBar(
+          percentage
+        )} ${processedCount}/${totalCount}\n当前: ${trimmedName}`,
       });
     }
 
     // 保存数据库更改
     await db.write();
-    
   } catch (error) {
     console.error(`[TPM] 批量卸载过程中发生错误:`, error);
-    await msg.edit({ text: `批量卸载过程中发生错误: ${error instanceof Error ? error.message : String(error)}` });
+    await msg.edit({
+      text: `批量卸载过程中发生错误: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    });
     return;
   }
 
@@ -527,21 +550,25 @@ async function uninstallMultiplePlugins(pluginNames: string[], msg: Api.Message)
   await loadPlugins();
 
   // 生成结果报告
-  const successCount = results.filter(r => r.success).length;
-  const failedCount = results.filter(r => !r.success).length;
-  
+  const successCount = results.filter((r) => r.success).length;
+  const failedCount = results.filter((r) => !r.success).length;
+
   let resultText = `\n📊 卸载完成\n\n`;
   resultText += `✅ 成功: ${successCount}\n`;
   resultText += `❌ 失败: ${failedCount}\n\n`;
-  
+
   if (successCount > 0) {
-    const successPlugins = results.filter(r => r.success).map(r => r.name);
-    resultText += `✅ 已卸载:\n${successPlugins.map(name => `  • ${name}`).join('\n')}\n\n`;
+    const successPlugins = results.filter((r) => r.success).map((r) => r.name);
+    resultText += `✅ 已卸载:\n${successPlugins
+      .map((name) => `  • ${name}`)
+      .join("\n")}\n\n`;
   }
-  
+
   if (failedCount > 0) {
-    const failedPlugins = results.filter(r => !r.success);
-    resultText += `❌ 卸载失败:\n${failedPlugins.map(r => `  • ${r.name}: ${r.reason}`).join('\n')}`;
+    const failedPlugins = results.filter((r) => !r.success);
+    resultText += `❌ 卸载失败:\n${failedPlugins
+      .map((r) => `  • ${r.name}: ${r.reason}`)
+      .join("\n")}`;
   }
 
   await msg.edit({ text: resultText });
@@ -641,10 +668,12 @@ async function search(msg: Api.Message) {
     const installTip =
       `\n💡 <b>安装方法:</b>\n` +
       `• <code>${mainPrefix}tpm i &lt;插件名&gt;</code> - 安装单个插件\n` +
+      `• <code>${mainPrefix}tpm i &lt;插件名1&gt; &lt;插件名2&gt;</code> - 安装多个插件\n` +
       `• <code>${mainPrefix}tpm i all</code> - 一键安装全部远程插件\n` +
       `• <code>${mainPrefix}tpm update</code> - 一键更新所有已安装的远程插件\n` +
       `• <code>${mainPrefix}tpm ls</code> - 查看已安装记录\n` +
-      `• <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> - 卸载插件`;
+      `• <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> - 卸载单个插件\n` +
+      `• <code>${mainPrefix}tpm rm &lt;插件名1&gt; &lt;插件名2&gt;</code> - 卸载多个插件`;
 
     const repoLink = `\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
 
@@ -960,17 +989,14 @@ async function updateAllPlugins(msg: Api.Message) {
 }
 
 class TpmPlugin extends Plugin {
-  description: string = `显示远程插件列表: <code>${mainPrefix}tpm search</code>, <code>${mainPrefix}tpm s</code>
-安装远程插件: <code>${mainPrefix}tpm install name</code>, <code>${mainPrefix}tpm i name</code>
-安装多个远程插件: <code>${mainPrefix}tpm i name1 name2 name3</code>
-从 Telegram 文件安装插件: 对某个文件回复 <code>${mainPrefix}tpm install</code>
-一键安装所有远程插件: <code>${mainPrefix}tpm i all</code>
-卸载插件: <code>${mainPrefix}tpm remove name</code>, <code>${mainPrefix}tpm rm name</code>, <code>${mainPrefix}tpm un name</code>, <code>${mainPrefix}tpm uninstall name</code>
-卸载多个插件: <code>${mainPrefix}tpm rm name1 name2 name3</code>
-一键更新所有已安装的远程插件: <code>${mainPrefix}tpm update</code>, <code>${mainPrefix}tpm ua</code>
-查看已安装记录精简版: <code>${mainPrefix}tpm list</code>, <code>${mainPrefix}tpm ls</code>
-查看已安装记录详细版: <code>${mainPrefix}tpm list -v</code>, <code>${mainPrefix}tpm ls -v</code>, <code>${mainPrefix}tpm lv</code>
-上传插件: <code>${mainPrefix}tpm upload name</code>, <code>${mainPrefix}tpm ul name</code>
+  description: string = `<code>${mainPrefix}tpm search</code> - 显示远程插件列表
+• <code>${mainPrefix}tpm i &lt;插件名&gt;</code> - 安装单个插件
+• <code>${mainPrefix}tpm i &lt;插件名1&gt; &lt;插件名2&gt;</code> - 安装多个插件
+• <code>${mainPrefix}tpm i all</code> - 一键安装全部远程插件
+• <code>${mainPrefix}tpm update</code> - 一键更新所有已安装的远程插件
+• <code>${mainPrefix}tpm ls</code> - 查看已安装记录
+• <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> - 卸载单个插件
+• <code>${mainPrefix}tpm rm &lt;插件名1&gt; &lt;插件名2&gt;</code> - 卸载多个插件
 `;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     tpm: async (msg) => {
