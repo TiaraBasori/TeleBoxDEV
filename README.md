@@ -212,18 +212,18 @@ abstract class Plugin {
 <tbody>
 <tr>
 <td><strong>📖 help</strong></td>
-<td><code>h</code>, <code>help</code>, <code>?</code></td>
+<td><code>h</code>, <code>help</code></td>
 <td>🎯 帮助系统和命令列表</td>
 </tr>
 <tr>
-<td><strong>📦 npm</strong></td>
-<td><code>npm</code></td>
+<td><strong>📦 tpm</strong></td>
+<td><code>tpm</code></td>
 <td>🔧 插件管理器（安装/卸载/搜索）</td>
 </tr>
 <tr>
-<td><strong>🆔 id</strong></td>
-<td><code>id</code></td>
-<td>🔍 获取用户/群组/频道详细信息</td>
+<td><strong>🛠️ debug</strong></td>
+<td><code>id</code>, <code>entity</code>, <code>msg</code>, <code>echo</code></td>
+<td>🔍 调试工具：获取用户/群组/频道详细信息</td>
 </tr>
 <tr>
 <td><strong>👑 sudo</strong></td>
@@ -238,7 +238,7 @@ abstract class Plugin {
 <tr>
 <td><strong>🏓 ping</strong></td>
 <td><code>ping</code></td>
-<td>🌐 网络连接测试</td>
+<td>🌐 网络延迟测试工具</td>
 </tr>
 <tr>
 <td><strong>📊 sysinfo</strong></td>
@@ -255,6 +255,31 @@ abstract class Plugin {
 <td><code>update</code></td>
 <td>⬆️ 系统更新管理</td>
 </tr>
+<tr>
+<td><strong>📦 bf</strong></td>
+<td><code>bf</code></td>
+<td>💾 数据备份工具</td>
+</tr>
+<tr>
+<td><strong>🔄 reload</strong></td>
+<td><code>reload</code>, <code>exit</code></td>
+<td>♻️ 插件重新加载和进程管理</td>
+</tr>
+<tr>
+<td><strong>📜 sendlog</strong></td>
+<td><code>sendlog</code>, <code>logs</code>, <code>log</code></td>
+<td>📤 日志文件发送工具</td>
+</tr>
+<tr>
+<td><strong>🔁 re</strong></td>
+<td><code>re</code></td>
+<td>🗣️ 消息复读工具</td>
+</tr>
+<tr>
+<td><strong>✅ sure</strong></td>
+<td><code>sure</code></td>
+<td>🤔 确认操作工具</td>
+</tr>
 </tbody>
 </table>
 
@@ -266,10 +291,17 @@ abstract class Plugin {
 
 </div>
 
-> 🔍 **查看可用插件** → `.tpm search`  
-> 📥 **安装插件** → `.tpm i <插件名>`  
-> 🗑️ **卸载插件** → `.tpm rm <插件名>`  
-> 📤 **上传插件** → `.tpm upload <插件名>`
+> 🔍 **查看可用插件** → `.tpm search` / `.tpm s`  
+> 📥 **安装插件** → `.tpm install <插件名>` / `.tpm i <插件名>`  
+> 📦 **批量安装** → `.tpm i <插件1> <插件2> <插件3>`  
+> 🌟 **一键安装全部** → `.tpm i all`  
+> 📁 **从文件安装** → 回复文件 + `.tpm install`  
+> 🗑️ **卸载插件** → `.tpm remove <插件名>` / `.tpm rm <插件名>`  
+> 🗂️ **批量卸载** → `.tpm rm <插件1> <插件2> <插件3>`  
+> 🔄 **一键更新全部** → `.tpm update` / `.tpm ua`  
+> 📋 **查看已安装** → `.tpm list` / `.tpm ls`  
+> 📊 **详细列表** → `.tpm list -v` / `.tpm lv`  
+> 📤 **上传插件** → `.tpm upload <插件名>` / `.tpm ul <插件名>`
 
 <div align="center">
 
@@ -283,7 +315,7 @@ abstract class Plugin {
 
 |  🏗️ **技术领域**   |   🔧 **技术选型**    | 📊 **版本** |
 | :----------------: | :------------------: | :---------: |
-|   🚀 **运行时**    |       Node.js        |   `20.x`    |
+|   🚀 **运行时**    |       Node.js        |   `20.19.4`    |
 |  💎 **开发语言**   |      TypeScript      |   `5.9.2`   |
 | 📡 **Telegram 库** |        GramJS        |  `2.26.22`  |
 |   💾 **数据库**    |    better-sqlite3    |  `12.2.0`   |
