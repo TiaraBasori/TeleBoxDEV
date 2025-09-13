@@ -142,15 +142,35 @@ function formatDate(date: Date): string {
 ### Plugin 基类（实际实现）
 
 ```typescript
+// 🎨 现代化的插件抽象类设计
 abstract class Plugin {
-  // 必需属性（abstract） - 必须实现，否则插件无法加载
-  abstract description: string | ((...args: any[]) => string | void) | ((...args: any[]) => Promise<string | void>);
-  abstract cmdHandlers: Record<string, (msg: Api.Message, trigger?: Api.Message) => Promise<void>>;
+  // 📝 必需属性 - 插件描述（支持动态生成）
+  abstract description:
+    | string
+    | ((...args: any[]) => string | void)
+    | ((...args: any[]) => Promise<string | void>);
+    
+  // ⚡ 必需属性 - 命令处理器映射表
+  abstract cmdHandlers: Record<
+    string,
+    (msg: Api.Message, trigger?: Api.Message) => Promise<void>
+  >;
   
-  // 可选属性
+  // 👂 可选属性 - 消息监听器
   listenMessageHandler?: (msg: Api.Message) => Promise<void>;
-  eventHandlers?: Array<{ event?: any; handler: (event: any) => Promise<void> }>;
-  cronTasks?: Record<string, { cron: string; description: string; handler: (client: TelegramClient) => Promise<void> }>;
+  
+  // 🎯 可选属性 - 事件处理器
+  eventHandlers?: Array<{
+    event?: any;
+    handler: (event: any) => Promise<void>;
+  }>;
+  
+  // ⏰ 可选属性 - 定时任务
+  cronTasks?: Record<string, {
+    cron: string;
+    description: string;
+    handler: (client: TelegramClient) => Promise<void>;
+  }>;
 }
 
 // ⚠️ 重要说明：
