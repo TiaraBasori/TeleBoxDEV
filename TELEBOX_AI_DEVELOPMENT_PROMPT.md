@@ -73,22 +73,15 @@ import sharp from "sharp";
 import Database from "better-sqlite3";
 import { JSONFilePreset } from "lowdb/node";
 
-// 文件处理
-import * as download from "download";
-import archiver from "archiver";
+// 文件系统
 import * as fs from "fs";
 import * as path from "path";
-
-// 中文处理
-import * as OpenCC from "opencc-js";
-import { pinyin } from "pinyin-pro";
-
-// 翻译
-import translate from "@vitalets/google-translate-api";
 
 // HTML解析
 import * as cheerio from "cheerio";
 
+// 动态导入（按需使用）
+// const translateModule = await import("@vitalets/google-translate-api");
 ```
 
 ### 必需工具函数
@@ -950,7 +943,6 @@ case 's':  // "s" 是 "search" 的别名
 case 'download':
 case 'dl':     // 简写别名
 case 'd':      // 超短别名
-case '下载':    // 中文别名
   await this.handleDownload();
   break;
 
@@ -958,27 +950,16 @@ case 'configuration':
 case 'config':
 case 'cfg':
 case 'set':
-case '配置':
   await this.handleConfig();
   break;
 ```
 
 ### 指令架构模式
 
-#### 推荐模式：主从指令模式（默认选择）
-**适用场景：** 大多数插件的标准架构，功能相关，共享配置或状态
+#### 模式一：主从指令模式（推荐，95%场景）
+**适用场景：** 功能相关，共享配置或状态，需要统一管理
 
 ```typescript
-// 单指令插件（支持多个别名）
-class SpeedtestPlugin extends Plugin {
-  cmdHandlers = {
-    speedtest: handleSpeedtest,  // 主指令
-    st: handleSpeedtest          // 别名
-  }
-}
-// 用户使用：.speedtest 或 .st
-
-// 主从指令插件
 class MusicPlugin extends Plugin {
   cmdHandlers = {
     music: async (msg) => {
@@ -1006,12 +987,12 @@ class MusicPlugin extends Plugin {
 ```
 
 **特点：**
-- 大多数插件使用这种模式
-- 支持指令别名（如 speedtest/st）和子指令别名（如 search/s）
+- 单一主指令，内部处理多个子指令
+- 支持子指令别名（如 search/s、help/h）
 - 便于功能扩展和配置管理
 - 统一的参数解析和错误处理
 
-#### 特殊模式：独立指令模式（需特别说明才使用）
+#### 模式二：独立指令模式（特殊场景）
 **适用场景：** 功能完全独立，用户明确要求使用短指令
 
 ```typescript
@@ -1026,13 +1007,15 @@ class BanPlugin extends Plugin {
 // 用户使用：.kick @user、.ban @user、.unban @user
 ```
 
-**注意：** 仅在用户明确要求使用短指令时才采用此模式
+**特点：**
+- 每个指令都是独立的处理函数
+- 用户直接使用短指令名
+- 适合功能简单、数量较少的指令组
 
 ### 选择指南
 
 **默认选择：主从指令模式**
 - ✅ 适合 95% 的插件开发场景
-- ✅ 支持指令别名（如 speedtest/st）
 - ✅ 支持子指令别名（如 search/s、help/h）
 - ✅ 便于功能扩展和维护
 - ✅ 统一的错误处理和帮助系统
@@ -1042,18 +1025,32 @@ class BanPlugin extends Plugin {
 - 功能极其简单且不会扩展
 - 与现有系统保持兼容性
 
-### 别名设置示例
+### 别名设置方案
 
-#### 指令级别别名（推荐）
+#### 指令级别别名
+**适用于：** 单一功能插件，需要提供简写方式
+
 ```typescript
 class SpeedtestPlugin extends Plugin {
   cmdHandlers = {
-    speedtest: handleSpeedtest,  // 主指令
-    st: handleSpeedtest,         // 简写别名
-    测速: handleSpeedtest        // 中文别名
+    speedtest: handleSpeedtest,  // 主指令（完整名称）
+    st: handleSpeedtest,         // 简写别名（首字母缩写）
   }
 }
 ```
+
+**speedtest.ts 插件的实际别名映射：**
+- `speedtest` - 主指令，完整功能名称
+- `st` - 简写别名，取 "SpeedTest" 的首字母缩写
+- 用户可以使用 `.speedtest` 或 `.st` 调用相同功能
+- 两个别名指向同一个处理函数，保持功能完全一致
+
+**别名设计原则：**
+1. **主指令**：使用完整的功能描述名称（如 `speedtest`）
+2. **简写别名**：通常取首字母缩写或常用简写（如 `st`）
+3. **字符限制**：别名仅支持英文字母和数字，不支持中文或特殊字符
+4. **一致性**：所有别名必须指向同一个处理函数
+5. **简洁性**：简写别名应该简短易记，通常 2-4 个字符
 
 #### 子指令级别别名
 ```typescript
@@ -1061,7 +1058,6 @@ switch(sub) {
   case 'download':
   case 'dl':
   case 'd':
-  case '下载':
     await this.handleDownload();
     break;
 }
