@@ -1040,3 +1040,26 @@ class TpmPlugin extends Plugin {
 }
 
 export default new TpmPlugin();
+
+if (require.main === module) {
+  console.log("TeleBox Plugin Manager (TPM) - Command Line Mode");
+  // console.log("Command line arguments:", process.argv.slice(2));
+
+  const args = process.argv.slice(2);
+  if (args.length === 0 || args?.[0] !== "install" || args?.length < 2) {
+    console.log("Usage: node tpm.ts <command> [options]");
+    console.log("Available commands:");
+    console.log("  install <plugin1> <plugin2> ...   - Install plugins");
+  }
+  installPlugin(args, {
+    edit: async ({ text }: any) => {
+      console.log(text);
+    },
+  } as any)
+    .then(() => {
+      console.log("Plugins installed successfully");
+    })
+    .catch((error) => {
+      console.error("Error installing plugins:", error);
+    });
+}

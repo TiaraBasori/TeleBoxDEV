@@ -4,6 +4,7 @@
   "description": "",
   "scripts": {
     "start": "tsx -r tsconfig-paths/register ./src/index.ts",
+    "tpm": "tsx -r tsconfig-paths/register ./src/plugin/tpm.ts",
     "dev": "NODE_ENV=development tsx -r tsconfig-paths/register ./src/index.ts"
   },
   "repository": {
