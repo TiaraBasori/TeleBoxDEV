@@ -1,6 +1,7 @@
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { getApiConfig } from "./apiConfig";
+import { readAppName } from "./teleboxInfoHelper";
 
 let client: TelegramClient;
 
@@ -10,7 +11,7 @@ async function initializeClient() {
     new StringSession(api.session),
     api.api_id!,
     api.api_hash!,
-    { connectionRetries: 5 }
+    { connectionRetries: 5, deviceModel: readAppName() }
   );
 }
 
