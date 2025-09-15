@@ -137,8 +137,7 @@ async function handleAddDel(
     text: `已${action === "add" ? "添加" : "删除"}: ${display}`,
     parseMode: "html",
   });
-  await sleep(2000);
-  await msg.delete();
+  await msg.deleteWithDelay(5000);
 }
 
 async function handleList(msg: Api.Message) {
@@ -198,8 +197,7 @@ async function handleChatAddDel(
     text: `已${action === "add" ? "添加" : "删除"}: ${display}`,
     parseMode: "html",
   });
-  await sleep(2000);
-  await msg.delete();
+  await msg.deleteWithDelay(5000);
 }
 async function handleChatList(msg: Api.Message) {
   const chats = withSureDB((db) => db.lsChats());
@@ -243,8 +241,7 @@ async function handleMsgAddDel(
           }</code>`,
     parseMode: "html",
   });
-  await sleep(2000);
-  await msg.delete();
+  await msg.deleteWithDelay(5000);
 }
 async function handleMsgList(msg: Api.Message) {
   const msgs = withSureDB((db) => db.lsMsgs());
@@ -380,10 +377,7 @@ class surePlugin extends Plugin {
       //     replyTo: msg.replyToMsgId,
       //   });
       // }
-      await sleep(2000);
-      try {
-        await msg.delete();
-      } catch (e) {}
+      await msg.deleteWithDelay(5000);
     };
 }
 const plugin = new surePlugin();
