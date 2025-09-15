@@ -1337,6 +1337,53 @@ class EncodePlugin extends Plugin {
 
 ### 常见错误示例
 
+#### ❌ 错误：插件导出方式错误（严重问题）
+```typescript
+// ❌ 错误：导出类而非实例，会导致插件无法加载
+class SSHPlugin extends Plugin {
+  // ... 插件实现
+}
+
+export default SSHPlugin;  // ❌ 错误：导出的是类
+```
+
+**问题现象：**
+- 在 TG 中输入命令没有任何反应
+- 插件看起来没有启用
+- 插件管理器无法识别插件
+
+**根本原因：**
+插件管理器在 `pluginManager.ts` 中通过 `instanceof Plugin` 检查导出的对象：
+```typescript
+// pluginManager.ts 第57行
+if (plugin instanceof Plugin && isValidPlugin(plugin)) {
+  validPlugins.push(plugin);
+}
+```
+
+类定义本身不是 Plugin 的实例，只有通过 `new` 创建的对象才是实例。
+
+#### ✅ 正确：必须导出插件实例
+```typescript
+class SSHPlugin extends Plugin {
+  // ... 插件实现
+}
+
+export default new SSHPlugin();  // ✅ 正确：导出实例
+```
+
+**修复步骤：**
+1. 检查插件文件最后一行的导出语句
+2. 确保使用 `export default new PluginClass();`
+3. 重启 TeleBox 服务让修改生效
+
+**验证方法：**
+```bash
+# 重启服务后测试
+.插件名称 help      # 应该显示帮助信息
+.ping              # 测试其他插件是否正常
+```
+
 #### ❌ 错误：混淆指令架构模式
 ```typescript
 // 错误：试图将子指令注册为独立指令
