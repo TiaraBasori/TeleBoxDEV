@@ -1,4 +1,4 @@
-import { CronJob } from "cron";
+import { CronJob, validateCronExpression } from "cron";
 
 type CronHandler = () => void | Promise<void>;
 
@@ -20,6 +20,12 @@ class CronManager {
   set(name: string, cron: string, handler: CronHandler): void {
     if (this.tasks.has(name)) {
       throw new Error(`Cron task "${name}" already exists.`);
+    }
+
+    const validate = validateCronExpression(cron)
+    if (!validate.valid) {
+      console.log(`CronManager set new cronJob ${name} error while invalid cron`, validate.error);
+      return;
     }
 
     const job = new CronJob(cron, () => {
