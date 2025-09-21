@@ -6,9 +6,12 @@ import { createDirectoryInTemp } from "@utils/pathHelpers";
 import fs from "fs";
 import path from "path";
 import { getGlobalClient } from "@utils/globalClient";
+import { exec } from "child_process";
+import { promisify } from "util";
 
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
+const execAsync = promisify(exec);
 
 const exitDir = createDirectoryInTemp("exit");
 const exitFile = path.join(exitDir, "msg.json");
@@ -82,6 +85,16 @@ class ReloadPlugin extends Plugin {
         );
       }
       process.exit(0);
+    },
+    pmr: async (msg) => {
+      await msg.delete();
+      setTimeout(async () => {
+        try {
+          await execAsync("pm2 restart telebox");
+        } catch (error) {
+          console.error("PM2 restart failed:", error);
+        }
+      }, 500);
     },
   };
 }
