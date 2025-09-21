@@ -10,6 +10,8 @@ import * as os from "os";
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
 class DebugPlugin extends Plugin {
+  ignoreEdited: boolean = false;
+
   description: string = `<code>${mainPrefix}id 回复一条消息 或 留空查看当前对话 或 消息链接 或 用户名</code> - 获取详细的用户、群组或频道信息
 <code>${mainPrefix}entity [id/@name] 或 回复一条消息 或 留空查看当前对话</code> - 获取 entity 信息
 <code>${mainPrefix}msg 回复一条消息</code> - 获取 msg 信息
@@ -30,35 +32,37 @@ class DebugPlugin extends Plugin {
         // 检查是否提供了参数（链接或用户名）
         if (messageLink) {
           let parseResult: ParseResult | null = null;
-          
+
           // 优先尝试解析Telegram链接
           if (messageLink.includes("t.me/")) {
             parseResult = await parseTelegramLink(client, messageLink);
           } else {
             // 直接输入用户名，尝试解析实体
             try {
-              const username = messageLink.startsWith('@') ? messageLink : `@${messageLink}`;
+              const username = messageLink.startsWith("@")
+                ? messageLink
+                : `@${messageLink}`;
               const entity = await client.getEntity(username);
               parseResult = {
-                type: 'entity',
+                type: "entity",
                 data: entity,
-                info: `解析用户名成功 - ${username}`
+                info: `解析用户名成功 - ${username}`,
               };
             } catch (error: any) {
               parseResult = {
-                type: 'entity',
+                type: "entity",
                 data: null,
-                info: `解析用户名失败: ${error.message}`
+                info: `解析用户名失败: ${error.message}`,
               };
             }
           }
-          
+
           if (parseResult && parseResult.data) {
-            if (parseResult.type === 'message') {
+            if (parseResult.type === "message") {
               // 消息链接解析结果
               const parsedMsg = parseResult.data as Api.Message;
               targetInfo += `🔗 ${parseResult.info}\n\n`;
-              
+
               if (parsedMsg.senderId) {
                 targetInfo += await formatUserInfo(
                   client,
@@ -71,7 +75,7 @@ class DebugPlugin extends Plugin {
               targetInfo += await formatMessageInfo(parsedMsg);
               targetInfo += "\n";
               targetInfo += await formatChatInfo(client, parsedMsg);
-            } else if (parseResult.type === 'entity') {
+            } else if (parseResult.type === "entity") {
               // 实体链接解析结果
               const entity = parseResult.data;
               targetInfo += `🔗 ${parseResult.info}\n\n`;
@@ -314,7 +318,7 @@ class DebugPlugin extends Plugin {
 
 // 解析结果接口
 interface ParseResult {
-  type: 'message' | 'entity';
+  type: "message" | "entity";
   data: Api.Message | any;
   info?: string;
 }
@@ -326,72 +330,77 @@ async function parseTelegramLink(
 ): Promise<ParseResult | null> {
   try {
     const cleanLink = link.trim();
-    
+
     // 消息链接格式: https://t.me/username/123 或 https://t.me/c/123456/789
-    const messageRegex = /https?:\/\/t\.me\/(?:c\/)?([^\/]+)\/(\d+)(?:\?[^#]*)?(?:#.*)?$/;
+    const messageRegex =
+      /https?:\/\/t\.me\/(?:c\/)?([^\/]+)\/(\d+)(?:\?[^#]*)?(?:#.*)?$/;
     const messageMatch = cleanLink.match(messageRegex);
-    
+
     if (messageMatch) {
       const [, chatIdentifier, messageId] = messageMatch;
       let chatId: any;
-      
-      if (cleanLink.includes('/c/')) {
+
+      if (cleanLink.includes("/c/")) {
         // 私有群组/频道链接: https://t.me/c/1272003941/940776
         // chatIdentifier = "1272003941", 需要加上 -100 前缀
         chatId = `-100${chatIdentifier}`;
       } else {
         // 公开频道/群组链接: https://t.me/username/123
         // 确保用户名以 @ 开头
-        chatId = chatIdentifier.startsWith('@') ? chatIdentifier : `@${chatIdentifier}`;
+        chatId = chatIdentifier.startsWith("@")
+          ? chatIdentifier
+          : `@${chatIdentifier}`;
       }
-      
+
       const messages = await client.getMessages(chatId, {
         ids: [parseInt(messageId)],
       });
-      
+
       if (messages.length > 0) {
         return {
-          type: 'message',
+          type: "message",
           data: messages[0],
-          info: `解析消息链接成功 - Chat: ${chatId}, Message: ${messageId}`
+          info: `解析消息链接成功 - Chat: ${chatId}, Message: ${messageId}`,
         };
       }
     }
-    
+
     // 实体链接格式: https://t.me/username 或 https://t.me/joinchat/xxx
     const entityRegex = /https?:\/\/t\.me\/([^\/\?#]+)(?:\?[^#]*)?(?:#.*)?$/;
     const entityMatch = cleanLink.match(entityRegex);
-    
+
     if (entityMatch) {
       const [, identifier] = entityMatch;
-      
+
       // 处理 joinchat 链接
-      if (identifier.startsWith('joinchat/')) {
+      if (identifier.startsWith("joinchat/")) {
         return {
-          type: 'entity',
+          type: "entity",
           data: null,
-          info: `暂不支持 joinchat 链接解析`
+          info: `暂不支持 joinchat 链接解析`,
         };
       }
-      
+
       // 解析用户名或频道
-      const username = identifier.startsWith('@') ? identifier : `@${identifier}`;
+      const username = identifier.startsWith("@")
+        ? identifier
+        : `@${identifier}`;
       const entity = await client.getEntity(username);
-      
+
       return {
-        type: 'entity',
+        type: "entity",
         data: entity,
-        info: `解析实体链接成功 - ${username}`
+        info: `解析实体链接成功 - ${username}`,
       };
     }
-    
+
     return null;
   } catch (error: any) {
-    console.error('解析链接失败:', error);
+    console.error("解析链接失败:", error);
     return {
-      type: 'entity',
+      type: "entity",
       data: null,
-      info: `解析失败: ${error.message}`
+      info: `解析失败: ${error.message}`,
     };
   }
 }
@@ -400,11 +409,15 @@ async function parseTelegramLink(
 async function formatEntityInfo(entity: any): Promise<string> {
   try {
     let info = "";
-    
+
     if (entity.className === "User") {
       info += `<b>USER</b>\n`;
-      info += `· Name: ${entity.firstName || ""} ${entity.lastName || ""}`.trim() + "\n";
-      info += `· Username: ${entity.username ? "@" + entity.username : "N/A"}\n`;
+      info +=
+        `· Name: ${entity.firstName || ""} ${entity.lastName || ""}`.trim() +
+        "\n";
+      info += `· Username: ${
+        entity.username ? "@" + entity.username : "N/A"
+      }\n`;
       info += `· ID: <code>${entity.id}</code>\n`;
       if (entity.bot) info += `· Type: Bot\n`;
       if (entity.verified) info += `· Verified\n`;
@@ -413,25 +426,29 @@ async function formatEntityInfo(entity: any): Promise<string> {
       const isChannel = entity.broadcast;
       info += `<b>${isChannel ? "CHANNEL" : "SUPERGROUP"}</b>\n`;
       info += `· Title: ${entity.title}\n`;
-      info += `· Username: ${entity.username ? "@" + entity.username : "N/A"}\n`;
+      info += `· Username: ${
+        entity.username ? "@" + entity.username : "N/A"
+      }\n`;
       const entityId = entity.id.toString();
       const fullId = entityId.startsWith("-100") ? entityId : `-100${entityId}`;
       info += `· ID: <code>${fullId}</code>\n`;
       if (entity.verified) info += `· Verified\n`;
-      if (entity.participantsCount) info += `· Members: ${entity.participantsCount}\n`;
+      if (entity.participantsCount)
+        info += `· Members: ${entity.participantsCount}\n`;
     } else if (entity.className === "Chat") {
       info += `<b>GROUP</b>\n`;
       info += `· Title: ${entity.title}\n`;
       const groupId = entity.id.toString();
       const fullGroupId = groupId.startsWith("-") ? groupId : `-${groupId}`;
       info += `· ID: <code>${fullGroupId}</code>\n`;
-      if (entity.participantsCount) info += `· Members: ${entity.participantsCount}\n`;
+      if (entity.participantsCount)
+        info += `· Members: ${entity.participantsCount}\n`;
     } else {
       info += `<b>ENTITY</b>\n`;
       info += `· Type: ${entity.className}\n`;
       info += `· ID: <code>${entity.id}</code>\n`;
     }
-    
+
     return info;
   } catch (error: any) {
     return `❌ 格式化实体信息失败: ${error.message}`;

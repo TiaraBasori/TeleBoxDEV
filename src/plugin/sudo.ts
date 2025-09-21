@@ -193,6 +193,7 @@ async function handleChatList(msg: Api.Message) {
   });
 }
 class sudoPlugin extends Plugin {
+  ignoreEdited: boolean = false; 
   description: string = `赋予其他用户使用 bot 权限\n<code>.sudo add (回复目标用户的消息或带上 uid/@username)</code> - 添加用户\n<code>.sudo del (回复目标用户的消息或带上 uid/@username)</code> - 删除用户\n<code>.sudo ls</code> - 列出所有用户\n\n⚠️ 若未设置对话白名单, 所有对话中均可使用\n<code>.sudo chat add (在当前对话中使用 或带上 id/@name)</code> - 添加对话到白名单\n<code>.sudo chat del (在当前对话中使用 或带上 id/@name)</code> - 从白名单删除对话\n<code>.sudo chat ls/list</code> - 列出对话白名单`;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     sudo: async (msg) => {
@@ -243,7 +244,7 @@ class sudoPlugin extends Plugin {
         formattingEntities: msg.entities,
       });
       if (sudoMsg)
-        await dealCommandPluginWithMessage({ cmd, msg: sudoMsg, trigger: msg });
+        await dealCommandPluginWithMessage({ cmd, msg: sudoMsg, trigger: msg, isEdited: false });
     };
 }
 const plugin = new sudoPlugin();
