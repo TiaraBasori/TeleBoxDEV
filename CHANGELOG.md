@@ -2,7 +2,7 @@
 
 ## [0.2.5] --2025-09-21
 
-- Plugin 添加 ignoreEdited 参数，插件将会监听编辑信息事件
+- Plugin 添加 ignoreEdited 参数，默认为 `true`, 即插件不监听编辑信息事件
 - eatgif 利用 ffmpeg 将 gif 转成 webm 表情包
 - 添加 dotenv 依赖 以及 env 配置文件
 

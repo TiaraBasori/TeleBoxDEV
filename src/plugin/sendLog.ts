@@ -177,7 +177,7 @@ const fn = async (msg: Api.Message) => {
 };
 
 class SendLogPlugin extends Plugin {
-  ignoreEdited: boolean = false;
+  ignoreEdited: boolean = true;
   description: string = `发送日志文件到收藏夹或自定义目标\n.sendlog set <对话 ID|@用户名|me> 设置发送目标 (默认 me)`;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     sendlog: fn,

@@ -22,7 +22,7 @@ async function handleExec(params: { msg: Api.Message; shellCommand: string }) {
 }
 
 class ExecPlugin extends Plugin {
-  ignoreEdited: boolean = false;
+  ignoreEdited: boolean = true;
   description: string = `运行 shell 命令`;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     exec: async (msg) => {

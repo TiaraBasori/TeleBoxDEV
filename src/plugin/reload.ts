@@ -39,7 +39,7 @@ if (fs.existsSync(exitFile)) {
 }
 
 class ReloadPlugin extends Plugin {
-  ignoreEdited: boolean = false;
+  ignoreEdited: boolean = true;
   description:
     | string
     | (() => string)

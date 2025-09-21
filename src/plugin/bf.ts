@@ -277,7 +277,7 @@ const help_text = `<code>${mainPrefix}bf</code> 备份 plugins + assets 目录
 
 // 插件类
 class BfPlugin extends Plugin {
-  ignoreEdited: boolean = false;
+  ignoreEdited: boolean = true;
 
   description = `\n📦 备份插件\n\n${help_text}
 

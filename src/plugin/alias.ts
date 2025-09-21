@@ -57,7 +57,7 @@ async function listAlias(args: string[], msg: Api.Message) {
 }
 
 class AliasPlugin extends Plugin {
-  ignoreEdited: boolean = false;
+  ignoreEdited: boolean = true;
   description: string = `插件命名重命名
 <code>${mainPrefix}alias set a b</code> - 即 使用别名 <code>a</code> 可以执行原始命令 <code>b</code>; 原始命令 <code>b</code> 可以有多个不重复的别名
 <code>${mainPrefix}alias del a</code>

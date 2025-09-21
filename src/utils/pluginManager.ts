@@ -6,7 +6,10 @@ import { NewMessageEvent, NewMessage } from "telegram/events";
 import { AliasDB } from "./aliasDB";
 import { Api, TelegramClient } from "telegram";
 import { cronManager } from "./cronManager";
-import { EditedMessage, EditedMessageEvent } from "telegram/events/EditedMessage";
+import {
+  EditedMessage,
+  EditedMessageEvent,
+} from "telegram/events/EditedMessage";
 
 type PluginEntry = {
   original?: string; // 主要用于重定向命令找到初始命令，从而可以调用相应的命令函数，不是重定向的可以不填写
@@ -123,7 +126,7 @@ async function dealCommandPluginWithMessage(param: {
   try {
     if (pluginEntry) {
       if (isEdited && pluginEntry.plugin.ignoreEdited) {
-        console.log(`插件 ${pluginEntry.plugin.constructor.name} 忽略编辑的消息`);
+        // console.log(`插件 ${pluginEntry.plugin.constructor.name} 忽略编辑的消息`);
         return;
       }
       const original = pluginEntry.original;
@@ -139,7 +142,9 @@ async function dealCommandPluginWithMessage(param: {
   }
 }
 
-async function dealCommandPlugin(event: NewMessageEvent | EditedMessageEvent): Promise<void> {
+async function dealCommandPlugin(
+  event: NewMessageEvent | EditedMessageEvent
+): Promise<void> {
   const msg = event.message;
   // 检查是否发送到 收藏信息
   const savedMessage = (msg as any).savedPeerId;
@@ -152,11 +157,11 @@ async function dealCommandPlugin(event: NewMessageEvent | EditedMessageEvent): P
   }
 }
 
-async function dealNewMsgEvent(event:NewMessageEvent): Promise<void> {
+async function dealNewMsgEvent(event: NewMessageEvent): Promise<void> {
   await dealCommandPlugin(event);
 }
 
-async function dealEditedMsgEvent(event:EditedMessageEvent): Promise<void> {
+async function dealEditedMsgEvent(event: EditedMessageEvent): Promise<void> {
   await dealCommandPlugin(event);
 }
 
