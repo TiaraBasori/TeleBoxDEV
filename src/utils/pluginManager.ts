@@ -29,7 +29,7 @@ if (envPrefixes.length > 0) {
 console.log(
   `[PREFIXES] ${prefixes.join(" ")} (${
     envPrefixes.length > 0 ? "" : "可"
-  }使用环境变量 TB_PREFIX 覆盖)`
+  }使用环境变量 TB_PREFIX 覆盖, 多个前缀用空格分隔)`
 );
 
 function getPrefixes(): string[] {
