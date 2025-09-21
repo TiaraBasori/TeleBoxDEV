@@ -612,6 +612,65 @@ class ExamplePlugin extends Plugin {
 }
 ```
 
+### Telegram 显示格式注意事项
+
+#### ⚠️ HTML 格式处理规范
+
+**发送文件时的格式设置：**
+```typescript
+// ✅ 正确：发送文件时明确设置 parseMode
+await client.sendFile(msg.peerId, {
+    file: item.media,
+    caption: item.caption,
+    parseMode: 'html',  // 必需！确保HTML格式正确解析
+    replyTo: msg.replyTo?.replyToMsgId
+});
+
+// ❌ 错误：未设置 parseMode，导致HTML标签显示为纯文本
+await client.sendFile(msg.peerId, {
+    file: item.media,
+    caption: item.caption
+});
+```
+
+**URL 链接的转义处理：**
+```typescript
+// ✅ 正确：对URL进行HTML转义
+caption: `<b>🎨 ${htmlEscape(title)}</b>
+
+🔗 <b>原图:</b> <a href="${htmlEscape(originalUrl)}">高清查看</a>
+📐 <b>尺寸:</b> <code>${width}×${height}</code>`
+
+// ❌ 错误：URL未转义，特殊字符可能导致HTML解析错误
+caption: `<b>🎨 ${htmlEscape(title)}</b>
+
+🔗 <b>原图:</b> <a href="${originalUrl}">高清查看</a>`
+```
+
+**TypeScript 类型兼容性：**
+```typescript
+// ✅ 正确：使用支持的属性
+interface MediaGroup {
+    media: string;
+    type: string;
+    caption?: string;
+    hasSpoiler?: boolean;  // 仅用于内部标记
+}
+
+// SendFile 时去除不兼容的属性
+await client.sendFile(msg.peerId, {
+    file: item.media,
+    caption: item.caption,
+    parseMode: 'html'
+    // 注意：不要添加 spoiler 属性，SendFileInterface 不支持
+});
+
+// ❌ 错误：使用不兼容的属性会导致 TypeScript 编译错误
+await client.sendFile(msg.peerId, {
+    spoiler: item.hasSpoiler  // 编译错误！
+});
+```
+
 ### 错误处理标准
 ```typescript
 // 标准错误处理模式（参考 music.ts）
