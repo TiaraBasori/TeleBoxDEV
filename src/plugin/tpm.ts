@@ -395,7 +395,7 @@ async function installPlugin(args: string[], msg: Api.Message) {
           if (db.data[pluginName]) {
             delete db.data[pluginName];
             await db.write();
-            overrideMessage = `\n⚠️ 已覆盖之前已安装的远程插件\n若需保持更新, 请 <code>.tpm i ${pluginName}</code>`;
+            overrideMessage = `\n⚠️ 已覆盖之前已安装的远程插件\n若需保持更新, 请 <code>${mainPrefix}tpm i ${pluginName}</code>`;
             console.log(`[TPM] 已从数据库中清除同名插件记录: ${pluginName}`);
           }
         } catch (error) {
