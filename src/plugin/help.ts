@@ -103,7 +103,6 @@ function htmlEscape(text: string): string {
 }
 
 class HelpPlugin extends Plugin {
-  ignoreEdited: boolean = true;
   description: string = "查看帮助信息和可用命令列表";
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     help: this.handleHelp,

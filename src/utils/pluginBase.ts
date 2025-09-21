@@ -6,8 +6,15 @@ type CronTask = {
   handler: (client: TelegramClient) => Promise<void>;
 };
 
+const cmdIgnoreEdited = !!JSON.parse(
+  process.env.TB_CMD_IGNORE_EDITED || "true"
+);
+console.log(
+  `[CMD_IGNORE_EDITED] 命令监听忽略编辑的消息: ${cmdIgnoreEdited} (可使用环境变量 TB_CMD_IGNORE_EDITED 覆盖)`
+);
+
 abstract class Plugin {
-  ignoreEdited: boolean = true;
+  ignoreEdited?: boolean = cmdIgnoreEdited;
   abstract description:
     | string
     | ((...args: any[]) => string | void)

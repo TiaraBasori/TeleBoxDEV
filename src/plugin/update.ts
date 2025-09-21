@@ -48,7 +48,6 @@ async function update(force = false, msg: Api.Message) {
 }
 
 class UpdatePlugin extends Plugin {
-  ignoreEdited: boolean = true;
   description: string = `更新项目：拉取最新代码并安装依赖\n<code>.update -f/-force</code> 强制更新`;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     update: async (msg) => {

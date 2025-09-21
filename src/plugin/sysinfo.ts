@@ -9,7 +9,6 @@ import * as fs from "fs";
 import { execSync } from "child_process";
 
 class TeleBoxSystemMonitor extends Plugin {
-  ignoreEdited: boolean = true;
   description = "显示系统信息";
   cmdHandlers = {
     sysinfo: this.handleSysInfo.bind(this),

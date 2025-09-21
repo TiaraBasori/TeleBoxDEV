@@ -267,7 +267,6 @@ function parseTarget(input: string): {
 }
 
 class PingPlugin extends Plugin {
-  ignoreEdited: boolean = true;
   description: string = `🏓 网络延迟测试工具\n\n• .ping - Telegram API延迟\n• .ping <IP/域名> - ICMP ping测试\n• .ping dc1-dc5 - 数据中心延迟\n• .ping all - 所有数据中心延迟`;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     ping: async (msg) => {

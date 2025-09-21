@@ -989,7 +989,6 @@ async function updateAllPlugins(msg: Api.Message) {
 }
 
 class TpmPlugin extends Plugin {
-  ignoreEdited: boolean = true;
   description: string = `<code>${mainPrefix}tpm search</code> - 显示远程插件列表
 • <code>${mainPrefix}tpm i &lt;插件名&gt;</code> - 安装单个插件
 • <code>${mainPrefix}tpm i &lt;插件名1&gt; &lt;插件名2&gt;</code> - 安装多个插件
