@@ -7,6 +7,7 @@ type CronTask = {
 };
 
 abstract class Plugin {
+  ignoreEdited: boolean = true;
   abstract description:
     | string
     | ((...args: any[]) => string | void)

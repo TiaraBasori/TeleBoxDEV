@@ -6,6 +6,7 @@ import { NewMessageEvent, NewMessage } from "telegram/events";
 import { AliasDB } from "./aliasDB";
 import { Api, TelegramClient } from "telegram";
 import { cronManager } from "./cronManager";
+import { EditedMessage, EditedMessageEvent } from "telegram/events/EditedMessage";
 
 type PluginEntry = {
   original?: string; // 主要用于重定向命令找到初始命令，从而可以调用相应的命令函数，不是重定向的可以不填写
@@ -113,25 +114,24 @@ function getCommandFromMessage(msg: Api.Message | string): string | null {
 
 async function dealCommandPluginWithMessage(param: {
   cmd: string;
+  isEdited: boolean;
   msg: Api.Message;
   trigger?: Api.Message;
 }) {
-  const { cmd, msg, trigger } = param;
+  const { cmd, msg, isEdited, trigger } = param;
   const pluginEntry = getPluginEntry(cmd);
   try {
     if (pluginEntry) {
+      if (isEdited && pluginEntry.plugin.ignoreEdited) {
+        console.log(`插件 ${pluginEntry.plugin.constructor.name} 忽略编辑的消息`);
+        return;
+      }
       const original = pluginEntry.original;
       if (original) {
         await pluginEntry.plugin.cmdHandlers[original](msg, trigger);
       } else {
         await pluginEntry.plugin.cmdHandlers[cmd](msg, trigger);
       }
-    } else {
-      const availableCommands = listCommands();
-      const helpText = `未知命令：<code>${cmd}</code>\n可用命令：${availableCommands
-        .map((c) => `<code>${c}</code>`)
-        .join(", ")}`;
-      await msg.edit({ text: helpText, parseMode: "html" });
     }
   } catch (error) {
     console.log(error);
@@ -139,16 +139,25 @@ async function dealCommandPluginWithMessage(param: {
   }
 }
 
-async function dealCommandPlugin(event: NewMessageEvent) {
+async function dealCommandPlugin(event: NewMessageEvent | EditedMessageEvent): Promise<void> {
   const msg = event.message;
   // 检查是否发送到 收藏信息
   const savedMessage = (msg as any).savedPeerId;
   if (msg.out || savedMessage) {
     const cmd = getCommandFromMessage(msg);
     if (cmd) {
-      await dealCommandPluginWithMessage({ cmd, msg });
+      const isEdited = event instanceof EditedMessageEvent;
+      await dealCommandPluginWithMessage({ cmd, msg, isEdited });
     }
   }
+}
+
+async function dealNewMsgEvent(event:NewMessageEvent): Promise<void> {
+  await dealCommandPlugin(event);
+}
+
+async function dealEditedMsgEvent(event:EditedMessageEvent): Promise<void> {
+  await dealCommandPlugin(event);
 }
 
 function dealListenMessagePlugin(client: TelegramClient): void {
@@ -216,7 +225,9 @@ async function loadPlugins() {
 
   let client = await getGlobalClient();
   // 注册插件命令处理器
-  client.addEventHandler(dealCommandPlugin, new NewMessage());
+  client.addEventHandler(dealNewMsgEvent, new NewMessage());
+  // 注册编辑消息处理器 (用于处理编辑后的命令)
+  client.addEventHandler(dealEditedMsgEvent, new EditedMessage({}));
   // 添加监听新消息事件的处理器
   dealListenMessagePlugin(client);
   // 添加cron事件
