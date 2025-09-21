@@ -10,7 +10,7 @@ import * as os from "os";
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
 class DebugPlugin extends Plugin {
-  description: string = `<code>${mainPrefix}id 回复一条消息 或 留空查看当前对话</code> - 获取详细的用户、群组或频道信息
+  description: string = `<code>${mainPrefix}id 回复一条消息 或 留空查看当前对话 或 消息链接</code> - 获取详细的用户、群组或频道信息
 <code>${mainPrefix}entity [id/@name] 或 回复一条消息 或 留空查看当前对话</code> - 获取 entity 信息
 <code>${mainPrefix}msg 回复一条消息</code> - 获取 msg 信息
 <code>${mainPrefix}echo 回复一条消息</code> - 尝试以原样回复
@@ -24,32 +24,59 @@ class DebugPlugin extends Plugin {
       let targetInfo = "";
 
       try {
-        // 如果有回复消息，优先显示回复信息
-        if (msg.replyTo) {
-          const repliedMsg = await msg.getReplyMessage();
-          if (repliedMsg?.senderId) {
-            targetInfo += await formatUserInfo(
-              client,
-              repliedMsg.senderId,
-              "REPLIED USER",
-              true
-            );
+        const [cmd, ...args] = msg.message.trim().split(/\s+/);
+        const messageLink = args.join(" ");
+
+        // 检查是否提供了消息链接
+        if (messageLink && messageLink.includes("t.me/")) {
+          const parsedMsg = await parseTelegramMessageLink(client, messageLink);
+          if (parsedMsg) {
+            // 显示链接消息的发送者信息
+            if (parsedMsg.senderId) {
+              targetInfo += await formatUserInfo(
+                client,
+                parsedMsg.senderId,
+                "LINK MESSAGE SENDER",
+                true
+              );
+              targetInfo += "\n";
+            }
+            // 显示链接消息的详细信息
+            targetInfo += await formatMessageInfo(parsedMsg);
+            targetInfo += "\n";
+            // 显示链接消息的聊天信息
+            targetInfo += await formatChatInfo(client, parsedMsg);
+          } else {
+            targetInfo = "❌ 无法解析消息链接或消息不存在";
+          }
+        } else {
+          // 原有逻辑：如果有回复消息，优先显示回复信息
+          if (msg.replyTo) {
+            const repliedMsg = await msg.getReplyMessage();
+            if (repliedMsg?.senderId) {
+              targetInfo += await formatUserInfo(
+                client,
+                repliedMsg.senderId,
+                "REPLIED USER",
+                true
+              );
+              targetInfo += "\n";
+            }
+          }
+
+          // 显示消息详细信息
+          targetInfo += await formatMessageInfo(msg);
+          targetInfo += "\n";
+
+          if (!msg.replyTo) {
+            // 没有回复消息时，显示自己的信息
+            targetInfo += await formatSelfInfo(client);
             targetInfo += "\n";
           }
+
+          // 显示聊天信息
+          targetInfo += await formatChatInfo(client, msg);
         }
-
-        // 显示消息详细信息
-        targetInfo += await formatMessageInfo(msg);
-        targetInfo += "\n";
-
-        if (!msg.replyTo) {
-          // 没有回复消息时，显示自己的信息
-          targetInfo += await formatSelfInfo(client);
-          targetInfo += "\n";
-        }
-
-        // 显示聊天信息
-        targetInfo += await formatChatInfo(client, msg);
 
         await msg.edit({
           text: targetInfo,
@@ -252,6 +279,36 @@ class DebugPlugin extends Plugin {
       await msg.delete();
     },
   };
+}
+
+// 解析Telegram消息链接
+async function parseTelegramMessageLink(
+  client: TelegramClient,
+  messageLink: string
+): Promise<Api.Message | null> {
+  try {
+    const urlRegex = /https?:\/\/t\.me\/(?:c\/)?([^\/]+)\/(\d+)/;
+    const match = messageLink.match(urlRegex);
+    if (!match) return null;
+    
+    const [, chatIdentifier, messageId] = match;
+    let chatId: any;
+    
+    if (messageLink.includes('/c/')) {
+      chatId = `-100${chatIdentifier}`;
+    } else {
+      chatId = chatIdentifier.startsWith('@') ? chatIdentifier : `@${chatIdentifier}`;
+    }
+    
+    const messages = await client.getMessages(chatId, {
+      ids: [parseInt(messageId)],
+    });
+    
+    return messages.length > 0 ? messages[0] : null;
+  } catch (error) {
+    console.error('解析消息链接失败:', error);
+    return null;
+  }
 }
 
 // 格式化消息信息
