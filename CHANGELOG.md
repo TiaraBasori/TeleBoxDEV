@@ -1,9 +1,11 @@
 # Changelog
 
-## [0.2.5] --2025-09-21
+## [0.2.5] --2025-09-22
 
-- Plugin 添加 ignoreEdited 参数，默认为 `true`, 即插件不监听编辑信息事件
-  - 命令监听忽略编辑的消息: `true` (可使用环境变量 `TB_CMD_IGNORE_EDITED` 覆盖)
+- 命令监听忽略编辑的消息: `true` (可使用环境变量 `TB_CMD_IGNORE_EDITED` 覆盖)
+- Plugin 添加 ignoreEdited 参数, 可覆盖全局设置
+- Plugin 添加 listenMessageHandlerIgnoreEdited 参数, 设置为 `false` 时, listener 会监听编辑的消息
+- 环境变量 `TB_LISTENER_HANDLE_EDITED` 可设置不忽略监听编辑的消息的插件
 - eatgif 利用 ffmpeg 将 gif 转成 webm 表情包
 - 添加 dotenv 依赖 以及 env 配置文件
 

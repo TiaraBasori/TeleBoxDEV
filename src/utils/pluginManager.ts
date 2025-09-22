@@ -59,6 +59,10 @@ async function setPlugins(basePath: string) {
     if (!mod) continue;
     const plugin = mod.default;
     if (plugin instanceof Plugin && isValidPlugin(plugin)) {
+      if (!plugin.name) {
+        plugin.name = path.basename(file, ".ts");
+      }
+
       validPlugins.push(plugin);
       const cmds = Object.keys(plugin.cmdHandlers);
       for (const cmd of cmds) {
@@ -165,6 +169,18 @@ async function dealEditedMsgEvent(event: EditedMessageEvent): Promise<void> {
   await dealCommandPlugin(event);
 }
 
+const listenerHandleEdited =
+  process.env.TB_LISTENER_HANDLE_EDITED?.split(/\s+/g).filter(
+    (p) => p.length > 0
+  ) || [];
+if (listenerHandleEdited.length > 0) {
+  console.log(
+    `[LISTENER_HANDLE_EDITED] 不忽略监听编辑的消息的插件: ${listenerHandleEdited.join(
+      ", "
+    )} (可使用环境变量 TB_LISTENER_HANDLE_EDITED 覆盖, 多个命令用空格分隔)`
+  );
+}
+
 function dealListenMessagePlugin(client: TelegramClient): void {
   for (const plugin of validPlugins) {
     const messageHandler = plugin.listenMessageHandler;
@@ -176,6 +192,18 @@ function dealListenMessagePlugin(client: TelegramClient): void {
           console.log("listenMessageHandler error:", error);
         }
       }, new NewMessage());
+      if (
+        !plugin.listenMessageHandlerIgnoreEdited ||
+        (plugin.name && listenerHandleEdited.includes(plugin.name))
+      ) {
+        client.addEventHandler(async (event: EditedMessageEvent) => {
+          try {
+            await messageHandler(event.message);
+          } catch (error) {
+            console.log("listenMessageHandler error:", error);
+          }
+        }, new EditedMessage({}));
+      }
     }
     const eventHandlers = plugin.eventHandlers;
     if (Array.isArray(eventHandlers) && eventHandlers.length > 0) {

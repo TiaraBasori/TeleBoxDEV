@@ -14,6 +14,7 @@ console.log(
 );
 
 abstract class Plugin {
+  name?: string;
   ignoreEdited?: boolean = cmdIgnoreEdited;
   abstract description:
     | string
@@ -23,6 +24,7 @@ abstract class Plugin {
     string,
     (msg: Api.Message, trigger?: Api.Message) => Promise<void>
   >;
+  listenMessageHandlerIgnoreEdited?: boolean = true;
   listenMessageHandler?: (msg: Api.Message) => Promise<void>;
   eventHandlers?: Array<{
     event?: any;
