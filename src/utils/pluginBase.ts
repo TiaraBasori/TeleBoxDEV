@@ -25,7 +25,10 @@ abstract class Plugin {
     (msg: Api.Message, trigger?: Api.Message) => Promise<void>
   >;
   listenMessageHandlerIgnoreEdited?: boolean = true;
-  listenMessageHandler?: (msg: Api.Message) => Promise<void>;
+  listenMessageHandler?: (
+    msg: Api.Message,
+    options?: { isEdited?: boolean }
+  ) => Promise<void>;
   eventHandlers?: Array<{
     event?: any;
     handler: (event: any) => Promise<void>;

@@ -189,18 +189,20 @@ function dealListenMessagePlugin(client: TelegramClient): void {
         try {
           await messageHandler(event.message);
         } catch (error) {
-          console.log("listenMessageHandler error:", error);
+          console.log("listenMessageHandler NewMessageerror:", error);
         }
       }, new NewMessage());
       if (
         !plugin.listenMessageHandlerIgnoreEdited ||
         (plugin.name && listenerHandleEdited.includes(plugin.name))
       ) {
-        client.addEventHandler(async (event: EditedMessageEvent) => {
+        client.addEventHandler(async (event: any) => {
           try {
-            await messageHandler(event.message);
+            await messageHandler(event.message, {
+              isEdited: true,
+            });
           } catch (error) {
-            console.log("listenMessageHandler error:", error);
+            console.log("listenMessageHandler EditedMessage error:", error);
           }
         }, new EditedMessage({}));
       }
