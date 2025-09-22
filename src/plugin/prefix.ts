@@ -1,6 +1,6 @@
 import { Plugin } from "@utils/pluginBase";
 import { Api } from "telegram";
-import { getPrefixes, setPrefixes, loadPlugins } from "@utils/pluginManager";
+import { getPrefixes, loadPlugins } from "@utils/pluginManager";
 import fs from "fs";
 import path from "path";
 
@@ -77,7 +77,14 @@ class PrefixPlugin extends Plugin {
         return;
       }
       const uniq = Array.from(new Set(list));
-      setPrefixes(uniq);
+      // 直接设置前缀以避免缓存问题
+      const pluginManager = require("@utils/pluginManager");
+      if (pluginManager.setPrefixes) {
+        pluginManager.setPrefixes(uniq);
+      } else {
+        // 备用方案：修改环境变量后重载
+        console.log('[prefix] setPrefixes 不可用，使用备用方案');
+      }
       const value = uniq.join(" ");
       (process.env as any).TB_PREFIX = value;
       let persisted = true;
