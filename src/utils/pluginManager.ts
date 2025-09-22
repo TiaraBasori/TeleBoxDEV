@@ -63,6 +63,10 @@ async function setPlugins(basePath: string) {
     if (!mod) continue;
     const plugin = mod.default;
     if (plugin instanceof Plugin && isValidPlugin(plugin)) {
+      if (!plugin.name) {
+        plugin.name = path.basename(file, ".ts");
+      }
+
       validPlugins.push(plugin);
       const cmds = Object.keys(plugin.cmdHandlers);
       for (const cmd of cmds) {
@@ -99,6 +103,10 @@ function listCommands(): string[] {
 function getCommandFromMessage(msg: Api.Message | string): string | null {
   let prefixes = getPrefixes();
   const text = typeof msg === "string" ? msg : msg.message;
+  // 如果发送的是 `!h`
+  // console.log(msg?.message); // 这里是 !h
+  // console.log(msg?.text); // 这里是 `!h`
+  // 目前是认为可以执行
   // 仅当消息以任一前缀开头时才解析
   const matched = prefixes.find((p) => text.startsWith(p));
   if (!matched) return null;
@@ -120,7 +128,7 @@ function getCommandFromMessage(msg: Api.Message | string): string | null {
 
 async function dealCommandPluginWithMessage(param: {
   cmd: string;
-  isEdited: boolean;
+  isEdited?: boolean;
   msg: Api.Message;
   trigger?: Api.Message;
 }) {
@@ -168,6 +176,19 @@ async function dealEditedMsgEvent(event: EditedMessageEvent): Promise<void> {
   await dealCommandPlugin(event);
 }
 
+const listenerHandleEdited =
+  process.env.TB_LISTENER_HANDLE_EDITED?.split(/\s+/g).filter(
+    (p) => p.length > 0
+  ) || [];
+
+console.log(
+  `[LISTENER_HANDLE_EDITED] 不忽略监听编辑的消息的插件: ${
+    listenerHandleEdited.length === 0
+      ? "未设置"
+      : listenerHandleEdited.join(", ")
+  } (可使用环境变量 TB_LISTENER_HANDLE_EDITED 设置, 多个插件用空格分隔)`
+);
+
 function dealListenMessagePlugin(client: TelegramClient): void {
   for (const plugin of validPlugins) {
     const messageHandler = plugin.listenMessageHandler;
@@ -176,9 +197,23 @@ function dealListenMessagePlugin(client: TelegramClient): void {
         try {
           await messageHandler(event.message);
         } catch (error) {
-          console.log("listenMessageHandler error:", error);
+          console.log("listenMessageHandler NewMessageerror:", error);
         }
       }, new NewMessage());
+      if (
+        !plugin.listenMessageHandlerIgnoreEdited ||
+        (plugin.name && listenerHandleEdited.includes(plugin.name))
+      ) {
+        client.addEventHandler(async (event: any) => {
+          try {
+            await messageHandler(event.message, {
+              isEdited: true,
+            });
+          } catch (error) {
+            console.log("listenMessageHandler EditedMessage error:", error);
+          }
+        }, new EditedMessage({}));
+      }
     }
     const eventHandlers = plugin.eventHandlers;
     if (Array.isArray(eventHandlers) && eventHandlers.length > 0) {
