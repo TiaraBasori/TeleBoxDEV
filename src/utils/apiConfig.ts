@@ -6,6 +6,7 @@ interface TelegramAPI {
   api_id?: number;
   api_hash?: string;
   session?: string;
+  proxy?: any;
 }
 
 const CONFIG_PATH = path.join(process.cwd(), "config.json");

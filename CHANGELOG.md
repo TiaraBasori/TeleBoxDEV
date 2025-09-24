@@ -1,7 +1,11 @@
 # Changelog
 
-## [0.2.5] --2025-09-22
+## [0.2.5] --2025-09-24
 
+- 支持配置 Telegram 代理
+  - 在 config.json 中设置 proxy 字段
+    - `"proxy": { "ip": "127.0.0.1", "port": 40000, "socksType": 5 }`
+  - [官方文档](https://gram.js.org/beta/interfaces/custom.ProxyInterface.html)
 - 命令监听忽略编辑的消息: `true` (可使用环境变量 `TB_CMD_IGNORE_EDITED` 覆盖)
 - Plugin 添加 ignoreEdited 参数, 可覆盖全局设置
 - Plugin 添加 listenMessageHandlerIgnoreEdited 参数, 设置为 `false` 时, listener 会监听编辑的消息
