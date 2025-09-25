@@ -72,7 +72,8 @@ function formatCommandList(commands: string[]): string {
 
   // 添加多子指令插件组
   if (pluginGroups.size > 0) {
-    result.push(`\n🔧 <b>功能模块:</b>`);
+    result.push(`🔧 <b>功能模块:</b>`);
+    const groupLines: string[] = [];
     for (const [mainCommand, subCommands] of pluginGroups) {
       const formattedSubs = subCommands
         .map((cmd) => {
@@ -86,8 +87,9 @@ function formatCommandList(commands: string[]): string {
           }`;
         })
         .join(" • ");
-      result.push(`<b>${mainCommand}:</b> ${formattedSubs}`);
+      groupLines.push(`<b>${mainCommand}:</b> ${formattedSubs}`);
     }
+    result.push(`<blockquote expandable>\n${groupLines.join("\n")}\n</blockquote>`);
   }
   aliasDB.close();
   return result.join("\n");
