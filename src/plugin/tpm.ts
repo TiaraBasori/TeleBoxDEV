@@ -574,6 +574,68 @@ async function uninstallMultiplePlugins(
   await msg.edit({ text: resultText });
 }
 
+// 清空插件目录并刷新本地缓存
+async function uninstallAllPlugins(msg: Api.Message) {
+  try {
+    await msg.edit({ text: "⚠️ 正在清空插件目录并刷新缓存..." });
+
+    let removed = 0;
+    let failed: string[] = [];
+
+    // 删除 plugins 目录下的 .ts 插件文件（排除备份、声明文件和下划线前缀）
+    try {
+      if (fs.existsSync(PLUGIN_PATH)) {
+        const files = fs.readdirSync(PLUGIN_PATH);
+        for (const file of files) {
+          const full = path.join(PLUGIN_PATH, file);
+          const isPluginTs =
+            file.endsWith(".ts") &&
+            !file.includes("backup") &&
+            !file.endsWith(".d.ts") &&
+            !file.startsWith("_");
+          if (!isPluginTs) continue;
+          try {
+            fs.unlinkSync(full);
+            removed++;
+          } catch (e) {
+            failed.push(file);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[TPM] 扫描插件目录失败:", e);
+    }
+
+    // 清空数据库
+    try {
+      const db = await getDatabase();
+      for (const k of Object.keys(db.data)) delete db.data[k];
+      await db.write();
+    } catch (e) {
+      console.error("[TPM] 清空数据库失败:", e);
+    }
+
+    // 重新加载插件
+    try {
+      await loadPlugins();
+    } catch (e) {
+      console.error("[TPM] 重新加载插件失败:", e);
+    }
+
+    let text = `✅ 已清空插件目录并刷新缓存\n\n🗑 删除文件: ${removed}`;
+    if (failed.length) {
+      const show = failed.slice(0, 10).join("\n• ");
+      text += `\n❌ 删除失败: ${failed.length}\n• ${show}${
+        failed.length > 10 ? `\n• ... 还有 ${failed.length - 10} 个失败` : ""
+      }`;
+    }
+    await msg.edit({ text, parseMode: "html" });
+  } catch (error) {
+    console.error("[TPM] 清空插件目录失败:", error);
+    await msg.edit({ text: `❌ 清空插件目录失败: ${error}` });
+  }
+}
+
 async function uploadPlugin(args: string[], msg: Api.Message) {
   const pluginName = args[1];
   if (!pluginName) {
@@ -628,7 +690,7 @@ async function search(msg: Api.Message) {
     let localOnlyCount = 0;
     let notInstalledCount = 0;
 
-    // 判断插件状态的函数
+    // 判断插件状态的函数（统计 + 返回标签）
     function getPluginStatus(pluginName: string, remoteUrl: string) {
       const hasLocal = localPlugins.has(pluginName);
       const dbRecord = dbPlugins[pluginName];
@@ -636,27 +698,30 @@ async function search(msg: Api.Message) {
       if (hasLocal && dbRecord && dbRecord.url === remoteUrl) {
         // 已安装: 本地有文件 + 数据库有记录 + URL匹配
         installedCount++;
-        return { status: "✅", label: "已安装" };
+        return { status: "✅", label: "已安装" } as const;
       } else if (hasLocal && !dbRecord) {
         // 本地同名插件: 本地有文件但数据库无记录
         localOnlyCount++;
-        return { status: "🔶", label: "本地同名" };
+        return { status: "🔶", label: "本地同名" } as const;
       } else {
         // 未安装: 本地无文件或URL不匹配
         notInstalledCount++;
-        return { status: "❌", label: "未安装" };
+        return { status: "❌", label: "未安装" } as const;
       }
     }
 
-    const pluginList = pluginNames
-      .map((plugin) => {
-        const pluginData = remotePlugins[plugin];
-        const remoteUrl = pluginData?.url || "";
-        const { status, label } = getPluginStatus(plugin, remoteUrl);
-        const description = pluginData?.desc || "暂无描述";
-        return `${status} <code>${plugin}</code> - ${description}`;
-      })
-      .join("\n");
+    // 生成完整的插件行（保持远程列表原始顺序，不分组）并缓存状态，避免重复统计
+    const pluginEntries: { name: string; status: string; desc: string }[] = [];
+    for (const plugin of pluginNames) {
+      const pluginData = remotePlugins[plugin];
+      const remoteUrl = pluginData?.url || "";
+      const { status } = getPluginStatus(plugin, remoteUrl);
+      const description = pluginData?.desc || "暂无描述";
+      pluginEntries.push({ name: plugin, status, desc: description });
+    }
+    const pluginLines: string[] = pluginEntries.map(
+      (p) => `${p.status} <code>${p.name}</code> - ${p.desc}`
+    );
 
     const statsInfo =
       `📊 <b>插件统计:</b>\n` +
@@ -666,67 +731,54 @@ async function search(msg: Api.Message) {
       `• ❌ 未安装: ${notInstalledCount} 个`;
 
     const installTip =
-      `\n💡 <b>安装方法:</b>\n` +
-      `• <code>${mainPrefix}tpm i &lt;插件名&gt;</code> - 安装单个插件\n` +
-      `• <code>${mainPrefix}tpm i &lt;插件名1&gt; &lt;插件名2&gt;</code> - 安装多个插件\n` +
-      `• <code>${mainPrefix}tpm i all</code> - 一键安装全部远程插件\n` +
-      `• <code>${mainPrefix}tpm update</code> - 一键更新所有已安装的远程插件\n` +
-      `• <code>${mainPrefix}tpm ls</code> - 查看已安装记录\n` +
-      `• <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> - 卸载单个插件\n` +
-      `• <code>${mainPrefix}tpm rm &lt;插件名1&gt; &lt;插件名2&gt;</code> - 卸载多个插件`;
+      `\n💡 <b>快捷操作</b>\n` +
+      `• <code>${mainPrefix}tpm i &lt;名称 [名称2 ...]&gt;</code> 安装/批量安装\n` +
+      `• <code>${mainPrefix}tpm i all</code> 全部安装\n` +
+      `• <code>${mainPrefix}tpm update</code> 更新已装\n` +
+      `• <code>${mainPrefix}tpm ls</code> 查看记录\n` +
+      `• <code>${mainPrefix}tpm rm &lt;名称&gt;</code> 卸载 \n` +
+      `• <code>${mainPrefix}tpm rm all</code> 清空`;
 
     const repoLink = `\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
 
-    const message = `🔍 <b>远程插件列表:</b>\n\n${statsInfo}\n\n<b>插件详情:</b>\n${pluginList}\n${installTip}\n${repoLink}`;
-    // 检查消息长度，如果超过 3500 则分段发送
-    if (message.length > 3500) {
-      const maxLength = 3500;
-      const parts = [];
-      let currentPart = "";
+    // 构造单条消息，插件列表整体折叠
+    const MAX_LEN = 3500; // 保守阈值，避免超过Telegram限制
+    const makeMessage = (lines: string[]) =>
+      `🔍 <b>远程插件列表:</b>\n\n${statsInfo}\n\n<b>插件详情（点击展开）:</b>\n<blockquote expandable>\n${lines.join("\n")}\n</blockquote>\n${installTip}\n${repoLink}`;
+    const makeMessageMinimal = (lines: string[]) =>
+      `🔍 <b>远程插件列表:</b>\n\n${statsInfo}\n\n<blockquote expandable>\n${lines.join("\n")}\n</blockquote>`;
 
-      // 按行分割消息
-      const lines = message.split("\n");
+    let message = makeMessage(pluginLines);
 
-      for (const line of lines) {
-        // 如果添加这一行会超过限制，先发送当前部分
-        if (currentPart.length + line.length + 1 > maxLength) {
-          if (currentPart) {
-            parts.push(currentPart);
-            currentPart = line;
-          } else {
-            // 单行就超过限制，强制截断
-            parts.push(line.substring(0, maxLength));
-            currentPart = line.substring(maxLength);
-          }
-        } else {
-          currentPart += (currentPart ? "\n" : "") + line;
+    // 如果消息过长，尝试去掉描述，仅保留插件名以保证单条消息
+    if (message.length > MAX_LEN) {
+      const compactLines = pluginEntries.map(
+        (p) => `${p.status} <code>${p.name}</code>`
+      );
+      message = makeMessage(compactLines);
+
+      // 仍然过长，则去掉安装提示与仓库链接
+      if (message.length > MAX_LEN) {
+        message = makeMessageMinimal(compactLines);
+      }
+
+      // 仍超长，裁剪行数以适配，并在末尾追加省略提示
+      if (message.length > MAX_LEN) {
+        const trimmed: string[] = [];
+        let acc = 0;
+        for (const line of compactLines) {
+          const l = line.length + 1; // 包含换行
+          if (acc + l > MAX_LEN - 200) break; // 为标题等预留空间
+          trimmed.push(line);
+          acc += l;
         }
+        const omitted = compactLines.length - trimmed.length;
+        if (omitted > 0) trimmed.push(`... 还有 ${omitted} 个`);
+        message = makeMessageMinimal(trimmed);
       }
-
-      // 添加最后一部分
-      if (currentPart) {
-        parts.push(currentPart);
-      }
-
-      // 发送第一部分（编辑原消息）
-      await msg.edit({
-        text:
-          parts[0] + (parts.length > 1 ? "\n\n📄 消息过长，已分段发送..." : ""),
-        parseMode: "html",
-        linkPreview: false,
-      });
-
-      // 发送剩余部分（新消息）
-      for (let i = 1; i < parts.length; i++) {
-        await msg.client?.sendMessage(msg.peerId, {
-          message: `📄 第${i + 1}/${parts.length}部分:\n\n${parts[i]}`,
-          parseMode: "html",
-          linkPreview: false,
-        });
-      }
-    } else {
-      await msg.edit({ text: message, parseMode: "html", linkPreview: false });
     }
+
+    await msg.edit({ text: message, parseMode: "html", linkPreview: false });
   } catch (error) {
     console.error("[TPM] 搜索插件失败:", error);
     await msg.edit({ text: `❌ 搜索插件失败: ${error}` });
@@ -760,98 +812,97 @@ async function showPluginRecords(msg: Api.Message, verbose?: boolean) {
 
     const notInDb = filePlugins.filter((n) => !dbNames.includes(n));
 
-    // 构建数据库记录列表
+    // 构建数据库记录列表（按更新时间降序）
     const sortedPlugins = dbNames
       .map((name) => ({ name, ...db.data[name] }))
       .sort((a, b) => b._updatedAt - a._updatedAt);
 
-    const dbSection =
-      dbNames.length === 0
-        ? ""
-        : sortedPlugins
-            .map((p) => {
-              const updateTime = new Date(p._updatedAt).toLocaleString("zh-CN");
-              const description = p.desc ? `\n📝 ${p.desc}` : "";
-              return verbose
-                ? `<code>${p.name}</code> 🕒 ${updateTime}${description}\n🔗 <a href="${p.url}">URL</a>`
-                : `<code>${p.name}</code>${p.desc ? ` - ${p.desc}` : ""}`;
-            })
-            .join("\n\n");
+    // 生成两种展示（简洁/详细），尽量减少空行
+    const dbLinesSimple = sortedPlugins.map((p) =>
+      `<code>${p.name}</code>${p.desc ? ` - ${p.desc}` : ""}`
+    );
+    const dbLinesVerbose = sortedPlugins.map((p) => {
+      const updateTime = new Date(p._updatedAt).toLocaleString("zh-CN");
+      const desc = p.desc ? `\n📝 ${p.desc}` : "";
+      return `<code>${p.name}</code> 🕒 ${updateTime}${desc}\n🔗 <a href="${p.url}">URL</a>`;
+    });
 
-    let notInDbSection = "";
-    if (notInDb.length > 0) {
-      const details = notInDb
-        .map((name) => {
-          const filePath = path.join(PLUGIN_PATH, `${name}.ts`);
-          let mtime = "未知";
-          try {
-            const stat = fs.statSync(filePath);
-            mtime = stat.mtime.toLocaleString("zh-CN");
-          } catch {}
-          return verbose
-            ? `<code>${name}</code> 🗄 ${mtime}`
-            : `<code>${name}</code>`;
-        })
-        .join("\n\n");
-      notInDbSection = `\n\n🗂 <b>本地插件 (${notInDb.length}个):</b>\n\n${details}`;
+    const localLinesSimple = notInDb.map((name) => `<code>${name}</code>`);
+    const localLinesVerbose = notInDb.map((name) => {
+      const filePath = path.join(PLUGIN_PATH, `${name}.ts`);
+      let mtime = "未知";
+      try {
+        const stat = fs.statSync(filePath);
+        mtime = stat.mtime.toLocaleString("zh-CN");
+      } catch {}
+      return `<code>${name}</code> 🗄 ${mtime}`;
+    });
+
+    const MAX_LEN = 3500;
+    const tip = verbose
+      ? ""
+      : `💡 可使用 <code>${mainPrefix}tpm ls -v</code> 查看详情信息`;
+
+    const makeMessage = (
+      dbLines: string[],
+      localLines: string[]
+    ): string => {
+      const dbBlock = dbLines.length
+        ? `\n<blockquote expandable>\n${dbLines.join("\n")}\n</blockquote>`
+        : `\n<blockquote expandable>\n（空）\n</blockquote>`;
+      const localPart = notInDb.length
+        ? `\n🗂 <b>本地插件 (${notInDb.length}个):</b>\n<blockquote expandable>\n${localLines.join(
+            "\n"
+          )}\n</blockquote>`
+        : "";
+      return `${tip ? tip + "\n\n" : ""}📚 <b>远程插件记录 (${dbNames.length}个)</b>${dbBlock}${localPart}`;
+    };
+
+    // 首选：按 verbose 参数使用对应行
+    let useVerbose = !!verbose;
+    let dbUse = useVerbose ? dbLinesVerbose : dbLinesSimple;
+    let localUse = useVerbose ? localLinesVerbose : localLinesSimple;
+    let message = makeMessage(dbUse, localUse);
+
+    // Fallback 1：过长则退化到简洁模式
+    if (message.length > MAX_LEN && useVerbose) {
+      useVerbose = false;
+      dbUse = dbLinesSimple;
+      localUse = localLinesSimple;
+      message = makeMessage(dbUse, localUse);
     }
 
-    let message = `${
-      verbose
-        ? ""
-        : `💡 可使用 <code>${mainPrefix}tpm ls -v</code> 查看详情信息\n\n`
-    }📚 <b>远程插件记录 (${dbNames.length}个)</b>${
-      dbNames.length === 0 ? "\n" : `\n\n`
-    }${dbSection}${notInDbSection}`;
+    // Fallback 2：仍过长则裁剪行数，附省略说明
+    if (message.length > MAX_LEN) {
+      let dbTrim = [...dbUse];
+      let localTrim = [...localUse];
+      let dbOmit = 0;
+      let localOmit = 0;
 
-    if (message.length > 3500) {
-      const maxLength = 3500;
-      const parts = [];
-      let currentPart = "";
+      const buildWithOmit = () => {
+        const dbLines = [...dbTrim];
+        const localLines = [...localTrim];
+        if (dbOmit > 0) dbLines.push(`... 还有 ${dbOmit} 个`);
+        if (localOmit > 0) localLines.push(`... 还有 ${localOmit} 个`);
+        return makeMessage(dbLines, localLines);
+      };
 
-      // 按行分割消息
-      const lines = message.split("\n");
-
-      for (const line of lines) {
-        // 如果添加这一行会超过限制，先发送当前部分
-        if (currentPart.length + line.length + 1 > maxLength) {
-          if (currentPart) {
-            parts.push(currentPart);
-            currentPart = line;
-          } else {
-            // 单行就超过限制，强制截断
-            parts.push(line.substring(0, maxLength));
-            currentPart = line.substring(maxLength);
-          }
+      message = buildWithOmit();
+      while (message.length > MAX_LEN && (dbTrim.length > 0 || localTrim.length > 0)) {
+        if (dbTrim.length >= localTrim.length && dbTrim.length > 0) {
+          dbTrim.pop();
+          dbOmit++;
+        } else if (localTrim.length > 0) {
+          localTrim.pop();
+          localOmit++;
         } else {
-          currentPart += (currentPart ? "\n" : "") + line;
+          break;
         }
+        message = buildWithOmit();
       }
-
-      // 添加最后一部分
-      if (currentPart) {
-        parts.push(currentPart);
-      }
-
-      // 发送第一部分（编辑原消息）
-      await msg.edit({
-        text:
-          parts[0] + (parts.length > 1 ? "\n\n📄 消息过长，已分段发送..." : ""),
-        parseMode: "html",
-        linkPreview: false,
-      });
-
-      // 发送剩余部分（新消息）
-      for (let i = 1; i < parts.length; i++) {
-        await msg.client?.sendMessage(msg.peerId, {
-          message: `📄 第${i + 1}/${parts.length}部分:\n\n${parts[i]}`,
-          parseMode: "html",
-          linkPreview: false,
-        });
-      }
-    } else {
-      await msg.edit({ text: message, parseMode: "html" });
     }
+
+    await msg.edit({ text: message, parseMode: "html", linkPreview: false });
   } catch (error) {
     console.error("[TPM] 读取插件数据库失败:", error);
     await msg.edit({ text: `❌ 读取数据库失败: ${error}` });
@@ -997,6 +1048,7 @@ class TpmPlugin extends Plugin {
 • <code>${mainPrefix}tpm ls</code> - 查看已安装记录
 • <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> - 卸载单个插件
 • <code>${mainPrefix}tpm rm &lt;插件名1&gt; &lt;插件名2&gt;</code> - 卸载多个插件
+• <code>${mainPrefix}tpm rm all</code> - 清空插件目录并刷新本地缓存
 `;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     tpm: async (msg) => {
@@ -1019,7 +1071,12 @@ class TpmPlugin extends Plugin {
         if (pluginNames.length === 0) {
           await msg.edit({ text: "请提供要卸载的插件名称" });
         } else if (pluginNames.length === 1) {
-          await uninstallPlugin(pluginNames[0], msg);
+          const name = pluginNames[0].toLowerCase();
+          if (name === "all") {
+            await uninstallAllPlugins(msg);
+          } else {
+            await uninstallPlugin(pluginNames[0], msg);
+          }
         } else {
           await uninstallMultiplePlugins(pluginNames, msg);
         }
