@@ -1,6 +1,6 @@
 {
   "name": "telebox",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "",
   "scripts": {
     "start": "tsx -r tsconfig-paths/register ./src/index.ts",

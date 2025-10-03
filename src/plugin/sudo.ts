@@ -7,6 +7,9 @@ import {
   getCommandFromMessage,
 } from "@utils/pluginManager";
 
+// 缓存下用户设置的 sudo 前缀，减少频繁 IO
+const envPrefixes = process.env.TB_SUDO_PREFIX?.split(/\s+/g).filter((p) => p.length > 0) || [];
+
 // 简单缓存 sudo 用户 ID，减少频繁 IO
 let sudoCache = { ids: [] as number[], cids: [] as number[], ts: 0 };
 const SUDO_CACHE_TTL = 10_000; // 10s
@@ -193,7 +196,15 @@ async function handleChatList(msg: Api.Message) {
   });
 }
 class sudoPlugin extends Plugin {
-  description: string = `赋予其他用户使用 bot 权限\n<code>.sudo add (回复目标用户的消息或带上 uid/@username)</code> - 添加用户\n<code>.sudo del (回复目标用户的消息或带上 uid/@username)</code> - 删除用户\n<code>.sudo ls</code> - 列出所有用户\n\n⚠️ 若未设置对话白名单, 所有对话中均可使用\n<code>.sudo chat add (在当前对话中使用 或带上 id/@name)</code> - 添加对话到白名单\n<code>.sudo chat del (在当前对话中使用 或带上 id/@name)</code> - 从白名单删除对话\n<code>.sudo chat ls/list</code> - 列出对话白名单`;
+  description: () => string = () => {
+    let text = `赋予其他用户使用 bot 权限\n<code>.sudo add (回复目标用户的消息或带上 uid/@username)</code> - 添加用户\n<code>.sudo del (回复目标用户的消息或带上 uid/@username)</code> - 删除用户\n<code>.sudo ls</code> - 列出所有用户\n\n⚠️ 若未设置对话白名单, 所有对话中均可使用\n<code>.sudo chat add (在当前对话中使用 或带上 id/@name)</code> - 添加对话到白名单\n<code>.sudo chat del (在当前对话中使用 或带上 id/@name)</code> - 从白名单删除对话\n<code>.sudo chat ls/list</code> - 列出对话白名单`;
+    if (envPrefixes.length > 0) {
+      text += `\n\n‼️当前 sudo 前缀：${envPrefixes
+        .map((p) => `<code>${p}</code>`)
+        .join(" ")}`;
+    }
+    return text
+  }
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     sudo: async (msg) => {
       const parts = msg.message.trim().split(/\s+/);
@@ -234,7 +245,7 @@ class sudoPlugin extends Plugin {
       if (!getSudoIds().includes(uid)) return;
       const cids = getSudoCids();
       if (cids.length > 0 && !cids.includes(cid)) return;
-      const cmd = getCommandFromMessage(msg);
+      const cmd = getCommandFromMessage(msg, envPrefixes);
       if (!cmd) return;
       // await dealCommandPluginWithMessage({ cmd, msg });
       const sudoMsg = await msg.client?.sendMessage(msg.peerId, {

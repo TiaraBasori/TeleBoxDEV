@@ -100,8 +100,11 @@ function listCommands(): string[] {
   return Array.from(cmds.values()).sort((a, b) => a.localeCompare(b));
 }
 
-function getCommandFromMessage(msg: Api.Message | string): string | null {
+function getCommandFromMessage(msg: Api.Message | string, diyPrefixes?: string[]): string | null {
   let prefixes = getPrefixes();
+  if (diyPrefixes && diyPrefixes.length > 0) {
+    prefixes = diyPrefixes;
+  }
   const text = typeof msg === "string" ? msg : msg.message;
   // 如果发送的是 `!h`
   // console.log(msg?.message); // 这里是 !h
