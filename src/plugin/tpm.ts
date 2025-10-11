@@ -1040,22 +1040,44 @@ async function updateAllPlugins(msg: Api.Message) {
 }
 
 class TpmPlugin extends Plugin {
-  description: string = `<code>${mainPrefix}tpm search</code> - 显示远程插件列表
-• <code>${mainPrefix}tpm i &lt;插件名&gt;</code> - 安装单个插件
+  description: string = `<b>📦 TeleBox 插件管理器 (TPM)</b>
+
+<b>🔍 查看插件:</b>
+• <code>${mainPrefix}tpm search</code> (别名: <code>s</code>) - 显示远程插件列表
+• <code>${mainPrefix}tpm ls</code> (别名: <code>list</code>) - 查看已安装记录
+• <code>${mainPrefix}tpm ls -v</code> 或 <code>${mainPrefix}tpm lv</code> - 查看详细记录
+
+<b>⬇️ 安装插件:</b>
+• <code>${mainPrefix}tpm i &lt;插件名&gt;</code> (别名: <code>install</code>) - 安装单个插件
 • <code>${mainPrefix}tpm i &lt;插件名1&gt; &lt;插件名2&gt;</code> - 安装多个插件
 • <code>${mainPrefix}tpm i all</code> - 一键安装全部远程插件
-• <code>${mainPrefix}tpm update</code> - 一键更新所有已安装的远程插件
-• <code>${mainPrefix}tpm ls</code> - 查看已安装记录
-• <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> - 卸载单个插件
+• <code>${mainPrefix}tpm i</code> (回复插件文件) - 安装本地插件文件
+
+<b>🔄 更新插件:</b>
+• <code>${mainPrefix}tpm update</code> (别名: <code>updateAll</code>, <code>ua</code>) - 一键更新所有已安装的远程插件
+
+<b>🗑️ 卸载插件:</b>
+• <code>${mainPrefix}tpm rm &lt;插件名&gt;</code> (别名: <code>remove</code>, <code>uninstall</code>, <code>un</code>) - 卸载单个插件
 • <code>${mainPrefix}tpm rm &lt;插件名1&gt; &lt;插件名2&gt;</code> - 卸载多个插件
 • <code>${mainPrefix}tpm rm all</code> - 清空插件目录并刷新本地缓存
+
+<b>⬆️ 上传插件:</b>
+• <code>${mainPrefix}tpm upload &lt;插件名&gt;</code> (别名: <code>ul</code>) - 上传指定插件文件
+
+<b>💡 使用提示:</b>
+• 支持批量操作，可同时处理多个插件
+• 自动备份旧版本插件到临时目录
+• 安装远程插件时会自动记录到数据库便于管理
 `;
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     tpm: async (msg) => {
       const text = msg.message;
       const [, ...args] = text.split(" ");
       if (args.length === 0) {
-        await msg.edit({ text: "请输入完整指令" });
+        await msg.edit({ 
+          text: this.description,
+          parseMode: "html"
+        });
         return;
       }
       const cmd = args[0];
@@ -1091,6 +1113,11 @@ class TpmPlugin extends Plugin {
         );
       } else if (cmd === "update" || cmd === "updateAll" || cmd === "ua") {
         await updateAllPlugins(msg);
+      } else {
+        await msg.edit({ 
+          text: `❌ 未知命令: <code>${cmd}</code>\n\n${this.description}`,
+          parseMode: "html"
+        });
       }
     },
   };
