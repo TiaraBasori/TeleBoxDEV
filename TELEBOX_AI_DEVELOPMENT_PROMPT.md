@@ -171,12 +171,16 @@ abstract class Plugin {
     description: string;
     handler: (client: TelegramClient) => Promise<void>;
   }>;
+  
+  // 🚫 可选属性 - 忽略编辑消息（默认: true）
+  ignoreEdited?: boolean;
 }
 
 // ⚠️ 重要说明：
 // 1. description 和 cmdHandlers 是 abstract，必须在子类中实现
 // 2. cmdHandlers 支持可选的 trigger 参数，用于处理触发消息
 // 3. eventHandlers 是新增的扩展功能，用于处理 Telegram 事件
+// 4. ignoreEdited 控制是否忽略编辑消息事件，默认为 true（推荐）
 ```
 
 ### Message API
@@ -529,6 +533,9 @@ const help_text = `📋 <b>示例插件</b>
 class ExamplePlugin extends Plugin {
   // 必须在 description 中引用 help_text
   description: string = `示例插件\n\n${help_text}`;
+  
+  // 推荐设置：忽略编辑消息（默认为 true）
+  ignoreEdited: boolean = true;
   
   cmdHandlers = {
     example: async (msg: Api.Message) => {
@@ -995,6 +1002,12 @@ const help_text = `📝 <b>插件名称</b>
 - [ ] **优先使用 lowdb 存储配置和Cookie**（自动保存，无需手动管理）
 - [ ] **注意 Telegram 消息长度限制 4096 字符**（超长需分割发送）
 - [ ] **明确区分指令架构模式**（详见指令架构设计章节）
+
+### 🔧 推荐配置（最佳实践）
+- [ ] **设置 `ignoreEdited: true`**（默认值，避免重复处理编辑消息）
+  - 防止用户编辑命令时重复触发插件
+  - 可通过环境变量 `TB_CMD_IGNORE_EDITED` 覆盖
+  - 特殊需求时可设为 `false`
 
 ## 指令架构设计
 
