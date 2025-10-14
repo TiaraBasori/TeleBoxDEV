@@ -1375,6 +1375,32 @@ const help_text = `📝 <b>插件名称</b>
   - 可通过环境变量 `TB_CMD_IGNORE_EDITED` 覆盖
   - 特殊需求时可设为 `false`
 
+### ⚠️ 插件命名规范
+
+**插件名称要求：**
+- **禁止使用单字母插件名**（如 `a.ts`、`x.ts`）
+- **插件名最少两位字母**（如 `ab.ts`、`my.ts`）
+- **推荐使用有意义的名称**（如 `music.ts`、`trace.ts`）
+
+```typescript
+// ❌ 错误：单字母插件名
+// 文件名：a.ts, b.ts, x.ts
+
+// ✅ 正确：多字母插件名
+// 文件名：ab.ts, my.ts, music.ts, trace.ts
+
+class MyPlugin extends Plugin {
+  // 插件实现
+}
+
+export default new MyPlugin();
+```
+
+**原因说明：**
+- 单字母命令容易产生冲突
+- 降低用户体验和可读性
+- 不利于插件管理和维护
+
 ## 环境变量配置
 
 ### 支持的环境变量
