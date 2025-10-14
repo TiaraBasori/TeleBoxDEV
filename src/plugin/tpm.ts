@@ -37,17 +37,15 @@ async function sendOrEditMessage(
     linkPreview: options?.linkPreview !== false,
   };
 
-  // 如果是私聊或者消息可以编辑，直接编辑
-  if (msg.isPrivate || msg.out) {
-    try {
-      await msg.edit(messageOptions);
-      return msg;
-    } catch (error) {
-      console.log(`[TPM] 编辑消息失败，尝试发送新消息: ${error}`);
-    }
+  // 优先尝试编辑消息（私聊、自己发送的消息、或bot消息）
+  try {
+    await msg.edit(messageOptions);
+    return msg;
+  } catch (error) {
+    console.log(`[TPM] 编辑消息失败，尝试发送新消息: ${error}`);
   }
 
-  // 在群组中发送新消息，保持话题上下文
+  // 编辑失败时，在群组中发送新消息，保持话题上下文
   const sendOptions: any = {
     message: text,
     parseMode: options?.parseMode || undefined,
@@ -61,6 +59,27 @@ async function sendOrEditMessage(
 
   const newMsg = await msg.client?.sendMessage(msg.peerId, sendOptions);
   return newMsg || msg;
+}
+
+// 专用于更新进度的函数：只编辑，失败则静默
+async function updateProgressMessage(
+  msg: Api.Message, 
+  text: string, 
+  options?: { parseMode?: string; linkPreview?: boolean }
+): Promise<boolean> {
+  const messageOptions = {
+    text,
+    parseMode: options?.parseMode || undefined,
+    linkPreview: options?.linkPreview !== false,
+  };
+
+  try {
+    await msg.edit(messageOptions);
+    return true;
+  } catch (error) {
+    console.log(`[TPM] 编辑进度消息失败，静默继续: ${error}`);
+    return false;
+  }
 }
 
 // 初始化数据库 (并迁移旧结构 { plugins: {...} } 到扁平结构)
@@ -940,6 +959,8 @@ async function showPluginRecords(msg: Api.Message, verbose?: boolean) {
 
 async function updateAllPlugins(msg: Api.Message) {
   const statusMsg = await sendOrEditMessage(msg, "🔍 正在检查待更新的插件...");
+  let canEdit = true; // 跟踪是否还能编辑消息
+  
   try {
     const db = await getDatabase();
     const dbPlugins = Object.keys(db.data);
@@ -955,7 +976,9 @@ async function updateAllPlugins(msg: Api.Message) {
     let skipCount = 0;
     const failedPlugins: string[] = [];
 
-    await sendOrEditMessage(statusMsg, `📦 开始更新 ${totalPlugins} 个插件...\n\n🔄 进度: 0/${totalPlugins} (0%)`, { parseMode: "html" });
+    if (canEdit) {
+      canEdit = await updateProgressMessage(statusMsg, `📦 开始更新 ${totalPlugins} 个插件...\n\n🔄 进度: 0/${totalPlugins} (0%)`, { parseMode: "html" });
+    }
 
     for (let i = 0; i < dbPlugins.length; i++) {
       const pluginName = dbPlugins[i];
@@ -964,8 +987,9 @@ async function updateAllPlugins(msg: Api.Message) {
       const progressBar = generateProgressBar(progress);
 
       try {
-        if ([0, dbPlugins.length - 1].includes(i) || i % 2 === 0) {
-          await sendOrEditMessage(statusMsg, `📦 正在更新插件: <code>${pluginName}</code>\n\n${progressBar}\n🔄 进度: ${
+        // 只在能编辑且需要更新进度时才尝试编辑
+        if (canEdit && ([0, dbPlugins.length - 1].includes(i) || i % 2 === 0)) {
+          canEdit = await updateProgressMessage(statusMsg, `📦 正在更新插件: <code>${pluginName}</code>\n\n${progressBar}\n🔄 进度: ${
               i + 1
             }/${totalPlugins} (${progress}%)\n✅ 成功: ${updatedCount}\n⏭️ 跳过: ${skipCount}\n❌ 失败: ${failedCount}`, { parseMode: "html" });
         }
@@ -1039,26 +1063,34 @@ async function updateAllPlugins(msg: Api.Message) {
       console.error("[TPM] 重新加载插件失败:", error);
     }
 
-    const successBar = generateProgressBar(100);
-    let resultMsg = `🎉 <b>一键更新完成!</b>\n\n${successBar}\n\n📊 <b>更新统计:</b>\n✅ 成功更新: ${updatedCount}/${totalPlugins}\n⏭️ 无需更新: ${skipCount}/${totalPlugins}\n❌ 更新失败: ${failedCount}/${totalPlugins}`;
-
-    if (failedPlugins.length > 0) {
-      const failedList = failedPlugins.slice(0, 5).join("\n• ");
-      const moreFailures =
-        failedPlugins.length > 5
-          ? `\n• ... 还有 ${failedPlugins.length - 5} 个失败`
-          : "";
-      resultMsg += `\n\n❌ <b>失败列表:</b>\n• ${failedList}${moreFailures}`;
+    // 更新完成后删除状态消息
+    try {
+      await statusMsg.delete();
+      console.log(`[TPM] 更新完成，已删除状态消息。统计: 成功${updatedCount}个, 跳过${skipCount}个, 失败${failedCount}个`);
+    } catch (error) {
+      console.log(`[TPM] 删除状态消息失败: ${error}`);
+      // 如果删除失败，尝试最后一次编辑显示完成状态
+      try {
+        await statusMsg.edit({ 
+          text: `✅ 更新完成 (成功${updatedCount}个, 跳过${skipCount}个, 失败${failedCount}个)`, 
+          parseMode: "html" 
+        });
+      } catch (editError) {
+        console.log(`[TPM] 最终编辑也失败: ${editError}`);
+      }
     }
-
-    if (updatedCount > 0) {
-      resultMsg += `\n\n🔄 插件已重新加载，可以开始使用!`;
-    }
-
-    await sendOrEditMessage(statusMsg, resultMsg, { parseMode: "html" });
   } catch (error) {
-    await sendOrEditMessage(statusMsg, `❌ 一键更新失败: ${error}`);
-    console.error("[TPM] 一键更新插件失败:", error);
+    console.error("[TPM] 一键更新失败:", error);
+    // 发生错误时尝试删除消息，如果删除失败则显示错误
+    try {
+      await statusMsg.delete();
+    } catch (deleteError) {
+      try {
+        await statusMsg.edit({ text: `❌ 一键更新失败: ${error}`, parseMode: "html" });
+      } catch (editError) {
+        console.log(`[TPM] 错误消息编辑失败: ${editError}`);
+      }
+    }
   }
 }
 
@@ -1085,15 +1117,10 @@ class TpmPlugin extends Plugin {
 • <code>${mainPrefix}tpm rm all</code> - 清空插件目录并刷新本地缓存
 
 <b>⬆️ 上传插件:</b>
-• <code>${mainPrefix}tpm upload &lt;插件名&gt;</code> (别名: <code>ul</code>) - 上传指定插件文件
+• <code>${mainPrefix}tpm upload &lt;插件名&gt;</code> (别名: <code>ul</code>) - 上传指定插件文件`;
 
-<b>💡 使用提示:</b>
-• 支持批量操作，可同时处理多个插件
-• 自动备份旧版本插件到临时目录
-• 安装远程插件时会自动记录到数据库便于管理
-• 支持在群组和话题中使用，自动适配消息发送方式
-• 支持回复消息操作，保持上下文关联
-`;
+  ignoreEdited: boolean = true;
+
   cmdHandlers: Record<string, (msg: Api.Message) => Promise<void>> = {
     tpm: async (msg) => {
       const text = msg.message;
