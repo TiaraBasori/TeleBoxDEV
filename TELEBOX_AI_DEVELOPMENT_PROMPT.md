@@ -1,5 +1,18 @@
 # TeleBox AI 开发规范
 
+## 目录
+
+- [核心架构](#核心架构)
+- [核心依赖引用](#核心依赖引用)
+- [核心API签名](#核心api签名)
+- [开发规范](#开发规范)
+- [环境变量配置](#环境变量配置)
+- [高级技巧](#高级技巧)
+- [通用API处理技巧](#通用api处理技巧)
+- [会员点击反应实现方案](#会员点击反应实现方案)
+- [工具函数库](#工具函数库)
+- [指令架构设计](#指令架构设计)
+
 ## 核心架构
 
 ```
@@ -440,6 +453,32 @@ formatEntity(target, mention?: boolean): Promise<{
 }>;
 ```
 
+### 频道ID处理（xream改进）
+
+```typescript
+// 处理频道ID的新方法（更可靠）
+function processChannelId(id: string | number): string {
+  // 旧方法：-1000000000000 减法处理不可靠
+  // 新方法：添加 -100 前缀
+  if (typeof id === 'string' && id.startsWith('-100')) {
+    return id;
+  }
+  return `-100${Math.abs(Number(id))}`;
+}
+
+// 获取实体时防止失败
+async function safeGetEntity(client: TelegramClient, peer: any) {
+  try {
+    // 每次执行前先刷新对话列表
+    await client.getDialogs({ limit: 100 });
+    return await client.getEntity(peer);
+  } catch (error) {
+    console.error("获取实体失败:", error);
+    return null;
+  }
+}
+```
+
 ### 路径管理 API
 
 ```typescript
@@ -459,13 +498,6 @@ cronManager.listTasks(): string[];
 // Cron表达式
 // "0 0 * * *"     每天0点
 // "*/5 * * * *"   每5分钟
-// "0 9 * * 1"     每周一9点
-```
-
-## 开发规范
-
-### 参数解析标准
-```typescript
 // 标准参数解析模式（参考 music.ts）
 const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
 const parts = lines?.[0]?.split(/\s+/) || [];
@@ -859,6 +891,328 @@ async function batchUnbanUsers(
 ): Promise<{ success: number[]; failed: number[]; }>;
 ```
 
+## 通用API处理技巧
+
+### ⚠️ 消息生命周期管理
+
+**自动删除消息的优雅处理：**
+```typescript
+// 通用的编辑并删除函数（参考 trace.ts）
+private async editAndDelete(msg: Api.Message, text: string, seconds: number = 5) {
+  await msg.edit({ text, parseMode: "html" });
+  
+  if (!this.shouldKeepLog()) {
+    // 创建定时器
+    const timer = setTimeout(() => {
+      msg.delete().catch(() => {}); // 添加 catch 确保安全
+    }, seconds * 1000);
+    
+    // 取消引用，允许 Node.js 进程优雅退出
+    timer.unref();
+  }
+}
+
+// 配置是否保留日志
+private shouldKeepLog(): boolean {
+  return this.config?.keepLog ?? true;
+}
+```
+
+### Premium 状态缓存机制
+
+```typescript
+class BasePlugin extends Plugin {
+  private isPremium: boolean | null = null;
+
+  // 通用 Premium 状态检测（带缓存）
+  protected async checkPremiumStatus(): Promise<boolean> {
+    if (this.isPremium === null) {
+      const client = await getGlobalClient();
+      if (client) {
+        const me = await client.getMe();
+        this.isPremium = (me as Api.User)?.premium || false;
+      } else {
+        this.isPremium = false;
+      }
+    }
+    return this.isPremium;
+  }
+
+  // 重置缓存（用于状态变更时）
+  protected resetPremiumCache(): void {
+    this.isPremium = null;
+  }
+}
+```
+
+### 通用数据库初始化模式
+
+```typescript
+// 通用数据库初始化模式
+class DatabasePlugin extends Plugin {
+  protected db: any;
+  
+  constructor(pluginName: string, defaultState: any) {
+    super();
+    this.initializeDB(pluginName, defaultState);
+  }
+
+  protected async initializeDB(pluginName: string, defaultState: any) {
+    const dbPath = path.join(createDirectoryInAssets(pluginName), "db.json");
+    this.db = await JSONFilePreset(dbPath, defaultState);
+  }
+
+  // 通用配置设置方法
+  protected async setConfig(msg: Api.Message, key: string, value: string, validValues?: string[]) {
+    if (validValues && !validValues.includes(value.toLowerCase())) {
+      await this.editAndDelete(msg, `❌ 无效值。可用值: ${validValues.join(', ')}`);
+      return false;
+    }
+
+    const processedValue = value.toLowerCase() === "true" ? true : 
+                          value.toLowerCase() === "false" ? false : value;
+    
+    this.db.data.config[key] = processedValue;
+    await this.db.write();
+    await this.editAndDelete(msg, `✅ <b>设置已更新:</b> <code>${key}</code> = <code>${processedValue}</code>`, 10);
+    return true;
+  }
+}
+```
+
+## 会员点击反应实现方案
+
+### 标准表情白名单管理
+
+```typescript
+// 可用标准表情常量（所有插件通用）
+const AVAILABLE_REACTIONS = "👍👎❤️🔥🥰👏😁🤔🤯😱🤬😢🎉🤩🤮💩🙏👌🕊🤡🥱🥴😍🐳❤️‍🔥🌚🌭💯🤣⚡️🍌🏆💔🤨😐🍓🍾💋🖕😈😎😇😤🏻‍💻";
+
+// 表情验证工具
+class ReactionValidator {
+  static isValidStandardReaction(emoji: string): boolean {
+    return AVAILABLE_REACTIONS.includes(emoji);
+  }
+
+  static filterValidReactions(emojis: string[]): string[] {
+    return emojis.filter(emoji => this.isValidStandardReaction(emoji));
+  }
+}
+```
+
+### 通用表情解析引擎
+
+```typescript
+// 通用表情解析类
+class ReactionParser {
+  private isPremium: boolean;
+
+  constructor(isPremium: boolean) {
+    this.isPremium = isPremium;
+  }
+
+  // 解析消息中的表情（支持标准表情和自定义表情）
+  async parseReactions(msg: Api.Message, text: string): Promise<(string | BigInteger)[]> {
+    const validReactions: (string | BigInteger)[] = [];
+    const customEmojiMap = new Map<number, BigInteger>();
+    const customEmojiIndices = new Set<number>();
+
+    // 处理自定义表情（仅 Premium 用户）
+    if (this.isPremium) {
+      const customEmojiEntities = (msg.entities || []).filter(
+        (e): e is Api.MessageEntityCustomEmoji => e instanceof Api.MessageEntityCustomEmoji
+      );
+      
+      for (const entity of customEmojiEntities) {
+        customEmojiMap.set(entity.offset, entity.documentId);
+        for (let i = 0; i < entity.length; i++) {
+          customEmojiIndices.add(entity.offset + i);
+        }
+      }
+    }
+
+    // 查找文本在消息中的位置
+    const textOffsetInMessage = msg.message.indexOf(text);
+    if (textOffsetInMessage === -1) return [];
+
+    // 逐字符解析表情
+    let currentIndex = 0;
+    for (const char of text) {
+      const fullMessageOffset = textOffsetInMessage + currentIndex;
+      
+      // 检查是否为自定义表情
+      if (customEmojiMap.has(fullMessageOffset)) {
+        validReactions.push(customEmojiMap.get(fullMessageOffset)!);
+      } 
+      // 检查是否为标准表情
+      else if (!customEmojiIndices.has(fullMessageOffset) && AVAILABLE_REACTIONS.includes(char)) {
+        validReactions.push(char);
+      }
+      
+      currentIndex += char.length;
+    }
+
+    // 去重并返回
+    return [...new Set(validReactions)];
+  }
+}
+```
+
+### 通用反应发送器
+
+```typescript
+// 通用反应发送类
+class ReactionSender {
+  // 发送反应到指定消息
+  static async sendReaction(
+    peer: Api.TypePeer, 
+    msgId: number, 
+    reactions: (string | BigInteger)[], 
+    big: boolean = true
+  ): Promise<boolean> {
+    const client = await getGlobalClient();
+    if (!client || reactions.length === 0) return false;
+
+    try {
+      // 构建反应对象
+      const reactionObjects = reactions.map(r => {
+        if (typeof r === 'string') {
+          // 标准表情
+          if (AVAILABLE_REACTIONS.includes(r)) {
+            return new Api.ReactionEmoji({ emoticon: r });
+          }
+          // 字符串形式的自定义表情ID
+          return new Api.ReactionCustomEmoji({ documentId: bigInt(r) });
+        } else {
+          // BigInteger 形式的自定义表情ID
+          return new Api.ReactionCustomEmoji({ documentId: bigInt(r) });
+        }
+      });
+
+      // 发送反应
+      await client.invoke(
+        new Api.messages.SendReaction({
+          peer,
+          msgId,
+          reaction: reactionObjects,
+          big
+        })
+      );
+      
+      return true;
+    } catch (error) {
+      console.error("[ReactionSender] 发送反应失败:", error);
+      return false;
+    }
+  }
+
+  // 批量发送反应（带延迟防止频率限制）
+  static async sendReactionsBatch(
+    targets: Array<{ peer: Api.TypePeer; msgId: number; reactions: (string | BigInteger)[] }>,
+    big: boolean = true,
+    delayMs: number = 1000
+  ): Promise<{ success: number; failed: number }> {
+    let success = 0;
+    let failed = 0;
+
+    for (const target of targets) {
+      const result = await this.sendReaction(target.peer, target.msgId, target.reactions, big);
+      if (result) {
+        success++;
+      } else {
+        failed++;
+      }
+      
+      // 添加延迟防止频率限制
+      if (delayMs > 0) {
+        await sleep(delayMs);
+      }
+    }
+
+    return { success, failed };
+  }
+}
+```
+
+### 会员点击反应监听器
+
+```typescript
+// 通用反应监听基类
+abstract class ReactionListener extends Plugin {
+  protected reactionParser: ReactionParser | null = null;
+  
+  // 消息监听器
+  public listenMessageHandler = this.handleMessage.bind(this);
+
+  protected async initReactionParser() {
+    if (!this.reactionParser) {
+      const isPremium = await this.checkPremiumStatus();
+      this.reactionParser = new ReactionParser(isPremium);
+    }
+  }
+
+  // 抽象方法：子类实现具体的反应逻辑
+  protected abstract shouldReact(msg: Api.Message): Promise<{
+    shouldReact: boolean;
+    reactions: (string | BigInteger)[];
+    big?: boolean;
+  }>;
+
+  private async handleMessage(msg: Api.Message) {
+    try {
+      const reactionConfig = await this.shouldReact(msg);
+      
+      if (reactionConfig.shouldReact && reactionConfig.reactions.length > 0) {
+        await ReactionSender.sendReaction(
+          msg.peerId, 
+          msg.id, 
+          reactionConfig.reactions, 
+          reactionConfig.big ?? true
+        );
+      }
+    } catch (error) {
+      console.error("[ReactionListener] 处理消息失败:", error);
+    }
+  }
+}
+
+// 使用示例：用户追踪反应插件
+class UserTrackingReactionPlugin extends ReactionListener {
+  protected async shouldReact(msg: Api.Message) {
+    const senderId = msg.senderId?.toString();
+    const trackedUsers = this.db?.data?.users || {};
+    
+    if (senderId && trackedUsers[senderId]) {
+      return {
+        shouldReact: true,
+        reactions: trackedUsers[senderId],
+        big: this.db?.data?.config?.big ?? true
+      };
+    }
+    
+    return { shouldReact: false, reactions: [] };
+  }
+}
+```
+
+### 使用示例
+
+```typescript
+// 基本反应发送
+await ReactionSender.sendReaction(msg.peerId, msg.id, ["👍", "❤️"], true);
+
+// 解析用户输入的表情
+await this.initReactionParser();
+const reactions = await this.reactionParser!.parseReactions(msg, "👍👎🥰");
+
+// 批量发送反应
+const targets = [
+  { peer: msg.peerId, msgId: msg.id, reactions: ["👍"] },
+  { peer: msg.peerId, msgId: msg.id + 1, reactions: ["❤️"] }
+];
+const result = await ReactionSender.sendReactionsBatch(targets, true, 500);
+```
+
 ### 实体格式化
 ```typescript
 async function formatEntity(target: any, mention?: boolean, throwErrorIfFailed?: boolean) {
@@ -875,9 +1229,9 @@ async function formatEntity(target: any, mention?: boolean, throwErrorIfFailed?:
   }
   
   const displayParts: string[] = [];
-  if (entity?.title) displayParts.push(entity.title);
-  if (entity?.firstName) displayParts.push(entity.firstName);
-  if (entity?.lastName) displayParts.push(entity.lastName);
+  if (entity?.title) displayParts.push(htmlEscape(entity.title));
+  if (entity?.firstName) displayParts.push(htmlEscape(entity.firstName));
+  if (entity?.lastName) displayParts.push(htmlEscape(entity.lastName));
   if (entity?.username) {
     displayParts.push(mention ? `@${entity.username}` : `<code>@${entity.username}</code>`);
   }
@@ -891,10 +1245,22 @@ async function formatEntity(target: any, mention?: boolean, throwErrorIfFailed?:
   
   return { id, entity, display: displayParts.join(" ").trim() };
 }
-```
 
-### 正则解析
-```typescript
+// 扩展 Api.Message 类型（xream 实现）
+declare module "telegram/tl/api" {
+  interface Message {
+    deleteWithDelay(delayMs?: number): Promise<void>;
+    safeDelete(params?: { revoke?: boolean }): Promise<void>;
+  }
+}
+
+// 使用示例
+await msg.edit({ text: "操作完成！" });
+await msg.deleteWithDelay(5000); // 5秒后删除
+
+// 安全删除（不会因权限问题导致进程退出）
+await msg.safeDelete({ revoke: true });
+
 function tryParseRegex(input: string): RegExp {
   const trimmed = input.trim();
   if (trimmed.startsWith("/") && trimmed.lastIndexOf("/") > 0) {
@@ -916,7 +1282,7 @@ const param1 = lines[1]; // 第二行作为参数
 const param2 = lines[2]; // 第三行作为参数
 ```
 
-## 高级工具函数
+## 工具函数库
 
 ### 命令执行
 ```typescript
@@ -1008,6 +1374,71 @@ const help_text = `📝 <b>插件名称</b>
   - 防止用户编辑命令时重复触发插件
   - 可通过环境变量 `TB_CMD_IGNORE_EDITED` 覆盖
   - 特殊需求时可设为 `false`
+
+## 环境变量配置
+
+### 支持的环境变量
+
+TeleBox 支持通过 `.env` 文件或系统环境变量进行配置：
+
+```bash
+# .env 文件示例
+# 命令前缀（空格分隔）
+TB_PREFIX=. 。
+
+# Sudo 命令前缀（空格分隔）
+TB_SUDO_PREFIX=# $
+
+# 全局设置命令是否忽略编辑的消息
+TB_CMD_IGNORE_EDITED=false
+
+# 设置哪些插件的监听不忽略编辑的消息（空格分隔）
+TB_LISTENER_HANDLE_EDITED=sudo sure
+
+# 连接重试次数
+TB_CONNECTION_RETRIES=5
+```
+
+### Telegram 代理配置
+
+在 `config.json` 中配置代理：
+
+```json
+{
+  "apiId": "your_api_id",
+  "apiHash": "your_api_hash",
+  "proxy": {
+    "ip": "127.0.0.1",
+    "port": 40000,
+    "socksType": 5  // SOCKS5 代理
+  }
+}
+```
+
+### 编辑消息处理机制
+
+```typescript
+// 插件级别的编辑消息控制
+class MyPlugin extends Plugin {
+  // 命令处理器是否忽略编辑消息（默认继承全局设置）
+  ignoreEdited?: boolean = cmdIgnoreEdited;
+  
+  // 监听器是否忽略编辑消息（默认为 true）
+  listenMessageHandlerIgnoreEdited?: boolean = true;
+  
+  // 监听器现在支持 isEdited 参数
+  listenMessageHandler = async (
+    msg: Api.Message,
+    options?: { isEdited?: boolean }
+  ) => {
+    if (options?.isEdited) {
+      // 处理编辑的消息
+      console.log("处理编辑消息");
+    }
+    // 正常处理逻辑
+  };
+}
+```
 
 ## 指令架构设计
 
