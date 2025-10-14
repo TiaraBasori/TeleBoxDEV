@@ -270,6 +270,7 @@ async function restoreBackup(extractPath: string): Promise<void> {
 }
 
 const help_text = `<code>${mainPrefix}bf</code> 备份 plugins + assets 目录
+<code>${mainPrefix}bf all</code> - 备份整个程序（包含所有文件）
 <code>${mainPrefix}bf set 对话ID</code> - 设置备份发送到的目标对话
 <code>${mainPrefix}bf to 对话ID</code> - 仅本次备份发送到目标对话
 <code>${mainPrefix}bf del 对话ID/all</code> - 删除备份发送到的目标对话
@@ -396,10 +397,18 @@ class BfPlugin extends Plugin {
         const backupPath = path.join(os.tmpdir(), backupName);
 
         // 确定要备份的目录
-        const dirsToBackup = [
-          path.join(programDir, "plugins"),
-          path.join(programDir, "assets"),
-        ].filter(fs.existsSync);
+        let dirsToBackup: string[] = [];
+        
+        if (cmd === "all") {
+          // 备份整个程序目录，不排除任何文件
+          dirsToBackup = [programDir];
+        } else {
+          // 默认只备份 plugins 和 assets
+          dirsToBackup = [
+            path.join(programDir, "plugins"),
+            path.join(programDir, "assets"),
+          ].filter(fs.existsSync);
+        }
 
         if (dirsToBackup.length === 0) {
           await msg.edit({
@@ -416,13 +425,16 @@ class BfPlugin extends Plugin {
 
         // 准备标题
         const stats = fs.statSync(backupPath);
+        const backupType = cmd === "all" ? "全量备份" : "标准备份";
+        const contentDesc = cmd === "all" 
+          ? "整个程序目录（包含所有文件）"
+          : dirsToBackup.map((d) => path.basename(d)).join(", ");
+        
         const caption =
-          `📦 <b>TeleBox 备份</b>\n\n` +
+          `📦 <b>TeleBox ${backupType}</b>\n\n` +
           `🕐 <b>时间</b>: ${formatCN(new Date())}\n` +
           `📊 <b>大小</b>: ${(stats.size / 1024 / 1024).toFixed(2)} MB\n` +
-          `📋 <b>内容</b>: ${dirsToBackup
-            .map((d) => path.basename(d))
-            .join(", ")}`;
+          `📋 <b>内容</b>: ${contentDesc}`;
 
         // 上传文件
         const savedTargets = await ConfigManager.getTargets();
@@ -462,13 +474,18 @@ class BfPlugin extends Plugin {
           fs.unlinkSync(backupPath);
         } catch {}
 
+        const backupTypeDisplay = cmd === "all" ? "全量备份" : "备份";
+        const contentDisplay = cmd === "all" 
+          ? "整个程序目录（包含所有文件）"
+          : dirsToBackup
+              .map((d) => path.basename(d))
+              .join(", ");
+        
         await msg.edit({
           text:
-            `✅ <b>备份完成</b>\n\n` +
+            `✅ <b>${backupTypeDisplay}完成</b>\n\n` +
             `🎯 <b>发送到</b>: ${destDisplays.join(", ")}\n` +
-            `📦 <b>内容</b>: ${dirsToBackup
-              .map((d) => path.basename(d))
-              .join(", ")}\n` +
+            `📦 <b>内容</b>: ${contentDisplay}\n` +
             `💾 <b>大小</b>: ${(stats.size / 1024 / 1024).toFixed(2)} MB`,
           parseMode: "html",
         });
