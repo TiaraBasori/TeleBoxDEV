@@ -11,7 +11,7 @@
 
 _基于 Node.js 和 TypeScript 构建，提供强大的插件系统和丰富的功能模块_
 
-[📖 快速开始](#-快速开始) • [🔌 插件生态](#-插件生态) • [🛠️ 开发指南](https://github.com/TeleBoxOrg/TeleBox/blob/main/TELEBOX_AI_DEVELOPMENT_PROMPT.md) • [📚 文档](#-相关链接)
+[📖 快速开始](#-快速开始) • [🔌 插件生态](#-插件生态) • [🛠️ 开发指南](https://github.com/TeleBoxOrg/TeleBox/blob/main/TELEBOX_DEVELOPMENT.md) • [📚 文档](#-相关链接)
 
 </div>
 
