@@ -1,4 +1,4 @@
-# TeleBox AI 开发规范
+# TeleBox 开发规范
 
 ## 目录
 
