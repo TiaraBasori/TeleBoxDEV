@@ -498,7 +498,7 @@ cronManager.listTasks(): string[];
 // Cron表达式
 // "0 0 * * *"     每天0点
 // "*/5 * * * *"   每5分钟
-// 标准参数解析模式（参考 music.ts）
+// 标准参数解析模式
 const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
 const parts = lines?.[0]?.split(/\s+/) || [];
 const [, ...args] = parts; // 跳过命令本身
@@ -712,7 +712,7 @@ await client.sendFile(msg.peerId, {
 
 ### 错误处理标准
 ```typescript
-// 标准错误处理模式（参考 music.ts）
+// 标准错误处理模式
 try {
   // 业务逻辑
   await msg.edit({ text: "🔄 处理中...", parseMode: "html" });
@@ -897,7 +897,7 @@ async function batchUnbanUsers(
 
 **自动删除消息的优雅处理：**
 ```typescript
-// 通用的编辑并删除函数（参考 trace.ts）
+// 通用的编辑并删除函数
 private async editAndDelete(msg: Api.Message, text: string, seconds: number = 5) {
   await msg.edit({ text, parseMode: "html" });
   
@@ -1176,21 +1176,31 @@ abstract class ReactionListener extends Plugin {
   }
 }
 
-// 使用示例：用户追踪反应插件
-class UserTrackingReactionPlugin extends ReactionListener {
+// 使用示例：基于特定条件的反应插件
+class ConditionalReactionPlugin extends ReactionListener {
   protected async shouldReact(msg: Api.Message) {
-    const senderId = msg.senderId?.toString();
-    const trackedUsers = this.db?.data?.users || {};
+    // 根据自定义逻辑判断是否需要反应
+    const shouldReactCondition = await this.checkCondition(msg);
     
-    if (senderId && trackedUsers[senderId]) {
+    if (shouldReactCondition) {
       return {
         shouldReact: true,
-        reactions: trackedUsers[senderId],
-        big: this.db?.data?.config?.big ?? true
+        reactions: await this.getReactions(msg),
+        big: this.getConfig('big') ?? true
       };
     }
     
     return { shouldReact: false, reactions: [] };
+  }
+  
+  private async checkCondition(msg: Api.Message): Promise<boolean> {
+    // 实现自定义条件检查逻辑
+    return false;
+  }
+  
+  private async getReactions(msg: Api.Message): Promise<(string | BigInteger)[]> {
+    // 实现获取反应的逻辑
+    return [];
   }
 }
 ```
@@ -1587,18 +1597,18 @@ class BanPlugin extends Plugin {
 **适用于：** 单一功能插件，需要提供简写方式
 
 ```typescript
-class SpeedtestPlugin extends Plugin {
+class ExamplePlugin extends Plugin {
   cmdHandlers = {
-    speedtest: handleSpeedtest,  // 主指令（完整名称）
-    st: handleSpeedtest,         // 简写别名（首字母缩写）
+    fullcommand: handleCommand,  // 主指令（完整名称）
+    fc: handleCommand,           // 简写别名（首字母缩写）
   }
 }
 ```
 
-**speedtest.ts 插件的实际别名映射：**
-- `speedtest` - 主指令，完整功能名称
-- `st` - 简写别名，取 "SpeedTest" 的首字母缩写
-- 用户可以使用 `.speedtest` 或 `.st` 调用相同功能
+**插件别名映射示例：**
+- `fullcommand` - 主指令，完整功能名称
+- `fc` - 简写别名，取首字母缩写
+- 用户可以使用 `.fullcommand` 或 `.fc` 调用相同功能
 - 两个别名指向同一个处理函数，保持功能完全一致
 
 **别名设计原则：**
@@ -1638,29 +1648,28 @@ switch(sub) {
 
 ```typescript
 // ❌ 错误：直接在 help_text 中使用代码和链接
-const help_text = `📝 <b>WARP 安装插件</b>
+const help_text = `📝 <b>功能插件</b>
 
-<b>安装方法：</b>
-wget -N https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&
-bash menu.sh e
+<b>使用方法：</b>
+command1 --option value
+command2 --flag
 
 <b>相关链接：</b>
 • 官网：https://example.com`;
 
 // ✅ 正确：使用 <pre> 标签包裹代码块和链接
-const help_text = `📝 <b>WARP 安装插件</b>
+const help_text = `📝 <b>功能插件</b>
 
-<b>🚀 方案1 - WARP+ (推荐)：</b>
-<pre>wget -N https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&
-bash menu.sh e</pre>
+<b>🚀 方案1 - 基础用法 (推荐)：</b>
+<pre>command1 --option value
+command2 --flag</pre>
 
-<b>🔧 方案2 - WireProxy：</b>
-<pre># 安装 WireProxy
-wget -N https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh &&
-bash menu.sh w
+<b>🔧 方案2 - 高级用法：</b>
+<pre># 配置环境
+command setup --config
 
-# 配置代理 (WireProxy 默认端口 40000)
-.music set proxy socks5://127.0.0.1:40000</pre>
+# 执行操作
+command run --param value</pre>
 
 <b>相关链接：</b>
 • 官网：<pre>https://example.com</pre>
@@ -1691,107 +1700,104 @@ bash menu.sh w
 
 #### 独立子指令模式（推荐用于功能独立的命令）
 ```typescript
-// aban.ts 风格 - 每个命令都是独立的
-class BanPlugin extends Plugin {
+// 独立指令风格 - 每个命令都是独立的
+class IndependentPlugin extends Plugin {
   cmdHandlers = {
-    kick: async (msg) => { /* 踢人逻辑 */ },
-    ban: async (msg) => { /* 封禁逻辑 */ },
-    unban: async (msg) => { /* 解封逻辑 */ },
-    mute: async (msg) => { /* 禁言逻辑 */ },
-    sb: async (msg) => { /* 批量封禁逻辑 */ }
+    action1: async (msg) => { /* 操作1逻辑 */ },
+    action2: async (msg) => { /* 操作2逻辑 */ },
+    action3: async (msg) => { /* 操作3逻辑 */ },
+    action4: async (msg) => { /* 操作4逻辑 */ },
+    action5: async (msg) => { /* 操作5逻辑 */ }
   }
 }
-// 用户使用：.kick @user、.ban @user、.unban @user
+// 用户使用：.action1 参数、.action2 参数、.action3 参数
 ```
 
 #### 附属子指令模式（推荐用于功能相关的命令组）
 ```typescript
-// music.ts 风格 - 所有子命令共享一个处理函数
-class MusicPlugin extends Plugin {
+// 主从指令风格 - 所有子命令共享一个处理函数
+class MainSubPlugin extends Plugin {
   cmdHandlers = {
-    music: async (msg) => {
+    maincommand: async (msg) => {
       const [sub, ...args] = msg.message.split(' ').slice(1);
       switch(sub) {
-        case 'search': await this.handleSearch(args);
-        case 'cookie': await this.handleCookie(args);
+        case 'subcommand1': await this.handleSubCommand1(args);
+        case 'subcommand2': await this.handleSubCommand2(args);
         case 'help': await this.showHelp();
       }
     }
   }
 }
-// 用户使用：.music search 歌名、.music cookie set、.music help
+// 用户使用：.maincommand subcommand1 参数、.maincommand subcommand2 参数、.maincommand help
 ```
 
-#### 3. 混合模式示例 - encode.ts（编码工具）
+#### 3. 混合模式示例
 ```typescript
-class EncodePlugin extends Plugin {
+class MixedModePlugin extends Plugin {
   cmdHandlers = {
-    // b64 和 url 是独立命令
-    b64: async (msg) => {
-      const [action, ...text] = parseArgs(msg.message);
-      // encode/decode 是 b64 的附属子指令
-      if (action === 'encode') await this.b64Encode(text);
-      if (action === 'decode') await this.b64Decode(text);
+    // command1 和 command2 是独立命令
+    command1: async (msg) => {
+      const [action, ...params] = parseArgs(msg.message);
+      // action1/action2 是 command1 的附属子指令
+      if (action === 'action1') await this.handleCommand1Action1(params);
+      if (action === 'action2') await this.handleCommand1Action2(params);
     },
     
-    url: async (msg) => {
-      const [action, ...text] = parseArgs(msg.message);
-      // encode/decode 是 url 的附属子指令
-      if (action === 'encode') await this.urlEncode(text);
-      if (action === 'decode') await this.urlDecode(text);
+    command2: async (msg) => {
+      const [action, ...params] = parseArgs(msg.message);
+      // action1/action2 是 command2 的附属子指令
+      if (action === 'action1') await this.handleCommand2Action1(params);
+      if (action === 'action2') await this.handleCommand2Action2(params);
     }
   }
 }
 
 // 用户使用
-// .b64 encode 你好世界
-// .b64 decode SGVsbG8gV29ybGQ=
-// .url encode https://example.com?q=你好
+// .command1 action1 参数
+// .command1 action2 参数
+// .command2 action1 参数
 ```
 
 ### 实际插件示例对比
 
-#### 1. 独立指令模式示例 - aban.ts（封禁管理）
+#### 1. 独立指令模式示例
 ```typescript
-class AbanPlugin extends Plugin {
+class IndependentCommandPlugin extends Plugin {
   cmdHandlers = {
     // 每个指令都是独立注册的
-    kick: handleKickCommand,     // .kick @user
-    ban: handleBanCommand,        // .ban @user  
-    unban: handleUnbanCommand,    // .unban @user
-    mute: handleMuteCommand,      // .mute @user 60
-    unmute: handleUnmuteCommand,  // .unmute @user
-    sb: handleSuperBanCommand,    // .sb @user
-    unsb: handleUnSuperBan,       // .unsb @user
-    refresh: handleRefreshCommand // .refresh
+    command1: handleCommand1,     // .command1 [参数]
+    command2: handleCommand2,     // .command2 [参数]  
+    command3: handleCommand3,     // .command3 [参数]
+    command4: handleCommand4,     // .command4 [参数]
+    command5: handleCommand5,     // .command5 [参数]
   }
 }
 
 // 用户直接使用每个指令
-// .kick @spammer
-// .ban @advertiser 广告
-// .mute @flooder 30
+// .command1 参数1
+// .command2 参数2
+// .command3 参数3
 ```
 
-#### 2. 主从指令模式示例 - music.ts（音乐下载）
+#### 2. 主从指令模式示例
 ```typescript
-class MusicPlugin extends Plugin {
+class MainSubCommandPlugin extends Plugin {
   cmdHandlers = {
-    music: async (msg) => {
+    maincommand: async (msg) => {
       const [sub, ...args] = parseArgs(msg.message);
       
       // 所有子指令都在这个函数内处理
       switch(sub) {
-        case 'search':
-        case 's':  // 别名
-          await this.searchMusic(args.join(' '));
+        case 'subcommand1':
+        case 's1':  // 别名
+          await this.handleSubCommand1(args);
           break;
           
-        case 'cookie':
+        case 'subcommand2':
           const action = args[0];
-          if (action === 'set') await this.setCookie(args.slice(1));
-          if (action === 'get') await this.getCookie();
-          if (action === 'clear') await this.clearCookie();
+          if (action === 'action1') await this.handleAction1(args.slice(1));
+          if (action === 'action2') await this.handleAction2();
+          if (action === 'action3') await this.handleAction3();
           break;
           
         case 'help':
@@ -1800,44 +1806,44 @@ class MusicPlugin extends Plugin {
           break;
           
         default:
-          // 默认行为：直接搜索
-          await this.searchMusic(msg.message.slice(6));
+          // 默认行为：执行默认操作
+          await this.handleDefault(msg.message);
       }
     }
   }
 }
 
 // 用户使用主指令 + 子指令
-// .music search 周杰伦 晴天
-// .music cookie set [cookie内容]
-// .music help
+// .maincommand subcommand1 参数
+// .maincommand subcommand2 action1 参数
+// .maincommand help
 ```
 
-#### 3. 混合模式示例 - encode.ts（编码工具）
+#### 3. 混合模式示例
 ```typescript
-class EncodePlugin extends Plugin {
+class MixedModePlugin extends Plugin {
   cmdHandlers = {
-    // b64 和 url 是独立命令
-    b64: async (msg) => {
-      const [action, ...text] = parseArgs(msg.message);
-      // encode/decode 是 b64 的附属子指令
-      if (action === 'encode') await this.b64Encode(text);
-      if (action === 'decode') await this.b64Decode(text);
+    // command1 和 command2 是独立命令
+    command1: async (msg) => {
+      const [action, ...params] = parseArgs(msg.message);
+      // action1/action2 是 command1 的附属子指令
+      if (action === 'action1') await this.handleCommand1Action1(params);
+      if (action === 'action2') await this.handleCommand1Action2(params);
     },
     
-    url: async (msg) => {
-      const [action, ...text] = parseArgs(msg.message);
-      // encode/decode 是 url 的附属子指令
-      if (action === 'encode') await this.urlEncode(text);
-      if (action === 'decode') await this.urlDecode(text);
+    command2: async (msg) => {
+      const [action, ...params] = parseArgs(msg.message);
+      // action1/action2 是 command2 的附属子指令
+      if (action === 'action1') await this.handleCommand2Action1(params);
+      if (action === 'action2') await this.handleCommand2Action2(params);
     }
   }
 }
 
 // 用户使用
-// .b64 encode 你好世界
-// .b64 decode SGVsbG8gV29ybGQ=
-// .url encode https://example.com?q=你好
+// .command1 action1 参数
+// .command1 action2 参数
+// .command2 action1 参数
 ```
 
 ### 选择指南
@@ -1856,12 +1862,12 @@ class EncodePlugin extends Plugin {
 
 ### 使用示例
 ```
-.b64 encode Hello World
-.b64 decode SGVsbG8gV29ybGQ=
-.url encode 你好世界
-.url decode %E4%BD%A0%E5%A5%BD%E4%B8%96%E7%95%8C
-.b64 help
-.url help
+.command1 action1 参数值
+.command1 action2 参数值
+.command2 action1 参数值
+.command2 action2 参数值
+.maincommand subcommand1 参数
+.maincommand help
 ```
 
 ### 常见错误示例
@@ -1943,56 +1949,56 @@ class CorrectPlugin extends Plugin {
 #### 独立子指令的帮助文档
 ```typescript
 // ✅ 必须定义 help_text 常量
-const help_text = `🛡️ <b>封禁管理插件</b>
+const help_text = `📋 <b>功能管理插件</b>
 
 <b>可用命令：</b>
-• <code>kick</code> - 踢出用户
-• <code>ban</code> - 封禁用户  
-• <code>unban</code> - 解封用户
-• <code>mute</code> - 禁言用户
+• <code>command1</code> - 执行操作1
+• <code>command2</code> - 执行操作2  
+• <code>command3</code> - 执行操作3
+• <code>command4</code> - 执行操作4
 
 <b>使用方式：</b>
 每个命令可独立使用，例如：
-<code>.kick @user</code>
-<code>.ban @user 原因</code>`;
+<code>.command1 参数</code>
+<code>.command2 参数 原因</code>`;
 
-class AbanPlugin extends Plugin {
+class IndependentPlugin extends Plugin {
   // ✅ 必须在 description 中引用 help_text
-  description: string = `封禁管理插件\n\n${help_text}`;
+  description: string = `功能管理插件\n\n${help_text}`;
 }
 ```
 
 #### 附属子指令的帮助文档
 ```typescript
-// ✅ 必须定义 help_text 常量（参考 music.ts 实际实现）
-const help_text = `🎵 <b>音乐下载插件</b>
+// ✅ 必须定义 help_text 常量
+const help_text = `📋 <b>综合功能插件</b>
 
 <b>命令格式：</b>
-<code>${mainPrefix}music [歌名] 或 ${mainPrefix}music [子命令] [参数]</code>
+<code>${mainPrefix}maincommand [参数] 或 ${mainPrefix}maincommand [子命令] [参数]</code>
 
 <b>子命令：</b>
-• <code>${mainPrefix}music search 歌名</code> - 搜索并下载音乐
-• <code>${mainPrefix}music cookie set [内容]</code> - 设置 YouTube Cookie
-• <code>${mainPrefix}music cookie get</code> - 查看当前 Cookie 状态
-• <code>${mainPrefix}music cookie clear</code> - 清除 Cookie
-• <code>${mainPrefix}music config</code> - 查看所有配置
-• <code>${mainPrefix}music help</code> - 显示此帮助
+• <code>${mainPrefix}maincommand subcommand1 参数</code> - 执行子功能1
+• <code>${mainPrefix}maincommand subcommand2 set [内容]</code> - 设置配置项
+• <code>${mainPrefix}maincommand subcommand2 get</code> - 查看当前配置
+• <code>${mainPrefix}maincommand subcommand2 clear</code> - 清除配置
+• <code>${mainPrefix}maincommand config</code> - 查看所有配置
+• <code>${mainPrefix}maincommand help</code> - 显示此帮助
 
 <b>配置命令：</b>
-• <code>${mainPrefix}music config apikey [密钥]</code> - 设置 Gemini API 密钥
-• <code>${mainPrefix}music config proxy [代理]</code> - 设置代理服务器
-• <code>${mainPrefix}music config quality [质量]</code> - 设置音频质量
+• <code>${mainPrefix}maincommand config key1 [值]</code> - 设置配置项1
+• <code>${mainPrefix}maincommand config key2 [值]</code> - 设置配置项2
+• <code>${mainPrefix}maincommand config key3 [值]</code> - 设置配置项3
 
 <b>使用示例：</b>
-<code>${mainPrefix}music 周杰伦 晴天</code> - 直接搜索
-<code>${mainPrefix}music search 林俊杰 江南</code> - 明确搜索`;
+<code>${mainPrefix}maincommand 参数值</code> - 直接执行
+<code>${mainPrefix}maincommand subcommand1 参数值</code> - 明确执行子命令`;
 
-class MusicPlugin extends Plugin {
+class MainCommandPlugin extends Plugin {
   // ✅ 必须在 description 中引用 help_text
-  description: string | ((...args: any[]) => string | void) = `音乐下载插件\n\n${help_text}`;
+  description: string | ((...args: any[]) => string | void) = `综合功能插件\n\n${help_text}`;
   
   cmdHandlers = {
-    music: async (msg: Api.Message) => {
+    maincommand: async (msg: Api.Message) => {
       const client = await getGlobalClient();
       if (!client) {
         await msg.edit({ text: "❌ 客户端未初始化", parseMode: "html" });
@@ -2022,7 +2028,7 @@ class MusicPlugin extends Plugin {
         // 处理其他子命令...
         
       } catch (error: any) {
-        console.error("[music] 插件执行失败:", error);
+        console.error("[plugin] 插件执行失败:", error);
         await msg.edit({
           text: `❌ <b>插件执行失败:</b> ${htmlEscape(error.message)}`,
           parseMode: "html"
