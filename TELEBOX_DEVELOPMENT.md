@@ -2,1481 +2,2662 @@
 
 ## 目录
 
-- [核心架构](#核心架构)
-- [核心依赖引用](#核心依赖引用)
-- [核心API签名](#核心api签名)
-- [开发规范](#开发规范)
-- [环境变量配置](#环境变量配置)
-- [高级技巧](#高级技巧)
-- [通用API处理技巧](#通用api处理技巧)
-- [会员点击反应实现方案](#会员点击反应实现方案)
-- [工具函数库](#工具函数库)
-- [指令架构设计](#指令架构设计)
+<details>
+<summary><b>📁 核心架构</b></summary>
 
-## 核心架构
+- [项目结构](#项目结构)
+- [核心模块](#核心模块)
+  - [程序入口 (index.ts)](#程序入口-indexts)
+  - [工具模块 (utils/)](#工具模块-utils)
+  - [系统插件 (plugin/)](#系统插件-plugin)
+  - [Hook系统 (hook/)](#hook系统-hook)
+- [目录组织](#目录组织)
+  - [源码目录结构](#源码目录结构)
+  - [插件目录结构](#插件目录结构)
+  - [资源目录结构](#资源目录结构)
+- [模块依赖关系](#模块依赖关系)
+</details>
+
+<details>
+<summary><b>⚙️ 环境配置</b></summary>
+
+- [必需配置文件](#必需配置文件)
+  - [config.json - Telegram API配置](#configjson---telegram-api配置)
+  - [.env - 环境变量配置](#env---环境变量配置)
+  - [package.json - 项目配置](#packagejson---项目配置)
+- [进程管理配置](#进程管理配置)
+  - [ecosystem.config.js - PM2配置](#ecosystemconfigjs---pm2配置)
+- [环境变量详解](#环境变量详解)
+  - [命令前缀配置](#命令前缀配置)
+  - [插件行为配置](#插件行为配置)
+  - [开发模式配置](#开发模式配置)
+- [配置文件示例](#配置文件示例)
+</details>
+
+<details>
+<summary><b>🔌 插件系统</b></summary>
+
+- [插件基类](#插件基类)
+- [插件加载机制](#插件加载机制)
+- [插件触发方式](#插件触发方式)
+  - [⚠️ 安全边界声明](#安全边界声明)
+  - [命令处理器 (cmdHandlers)](#命令处理器-cmdhandlers)
+  - [消息监听器 (listenMessageHandler)](#消息监听器-listenmessagehandler)
+  - [事件处理器 (eventHandlers)](#事件处理器-eventhandlers)
+  - [定时任务 (cronTasks)](#定时任务-crontasks)
+</details>
+
+<details>
+<summary><b>🎨 指令架构设计</b></summary>
+
+- [术语定义](#术语定义)
+  - [指令 (Command)](#1-指令-command)
+  - [子指令 (Subcommand)](#2-子指令-subcommand)
+  - [别名 (Alias)](#3-别名-alias)
+- [指令架构模式](#指令架构模式)
+  - [主从指令模式（99%场景）](#模式一主从指令模式推荐99场景)
+  - [独立指令模式（1%场景）](#模式二独立指令模式特殊场景1)
+- [选择指南](#选择指南)
+- [帮助系统设计](#帮助系统设计)
+- [参数解析模式](#参数解析模式)
+- [错误处理规范](#错误处理规范)
+</details>
+
+<details>
+<summary><b>📋 开发规范</b></summary>
+
+- [命名规范](#命名规范)
+  - [文件命名](#文件命名)
+  - [变量命名](#变量命名)
+  - [命令命名](#命令命名)
+- [代码风格](#代码风格)
+  - [TypeScript规范](#typescript规范-1)
+  - [异步处理](#异步处理)
+- [错误处理](#错误处理)
+  - [错误捕获](#错误捕获)
+  - [错误分类](#错误分类)
+- [日志规范](#日志规范)
+  - [日志级别](#日志级别)
+  - [日志格式](#日志格式)
+- [注释规范](#注释规范)
+  - [文件头注释](#文件头注释)
+  - [函数注释](#函数注释)
+  - [行内注释](#行内注释)
+</details>
+
+<details>
+<summary><b>📦 核心工具模块</b></summary>
+
+- [插件管理器](#插件管理器)
+- [全局客户端](#全局客户端)
+- [数据库工具](#数据库工具)
+</details>
+
+<details>
+<summary><b>🔍 核心API签名</b></summary>
+
+- [消息限制](#消息限制)
+- [Message API](#message-api)
+- [Client API](#client-api)
+- [Database API](#database-api)
+</details>
+
+<details>
+<summary><b>📝 插件开发框架</b></summary>
+
+- [常用工具函数](#常用工具函数)
+</details>
+
+
+<details>
+<summary><b>🚀 完整插件示例</b></summary>
+
+- [简单命令插件](#简单命令插件)
+- [数据库插件](#数据库插件)
+- [监听器插件](#监听器插件)
+- [定时任务插件](#定时任务插件)
+</details>
+
+<details>
+<summary><b>🔧 系统插件说明</b></summary>
+
+- [基础功能插件](#基础功能插件)
+  - [help - 帮助系统](#help---帮助系统)
+  - [alias - 命令别名](#alias---命令别名)
+  - [sudo - 权限管理](#sudo---权限管理)
+  - [debug - 调试工具](#debug---调试工具)
+- [系统管理插件](#系统管理插件)
+  - [sysinfo - 系统信息](#sysinfo---系统信息)
+  - [update - 更新管理](#update---更新管理)
+  - [bf - 备份管理](#bf---备份管理)
+  - [tpm - TeleBox插件包管理器](#tpm---telebox插件包管理器)
+</details>
+
+<details>
+<summary><b>🎯 用户插件示例</b></summary>
+
+- [群组管理类](#群组管理类)
+  - [aban - 自动封禁管理](#aban---自动封禁管理)
+  - [clean_member - 成员清理](#clean_member---成员清理)
+  - [pmcaptcha - 私聊验证码](#pmcaptcha---私聊验证码)
+- [实用工具类](#实用工具类)
+  - [image_monitor - 图片监控](#image_monitor---图片监控)
+  - [rate - 汇率查询](#rate---汇率查询)
+  - [speedtest - 网速测试](#speedtest---网速测试)
+  - [music - 音乐搜索下载](#music---音乐搜索下载)
+- [高级功能类](#高级功能类)
+  - [ssh - SSH远程管理](#ssh---ssh远程管理)
+  - [shift - 任务调度系统](#shift---任务调度系统)
+  - [sub - 订阅管理](#sub---订阅管理)
+</details>
+
+
+
+## 📁 核心架构
+
+### 项目结构
 
 ```
 telebox/
-├── src/utils/          # 核心工具模块
-├── plugins/            # 用户插件目录  
-├── assets/             # 资源文件目录
-├── temp/               # 临时文件目录
-└── config.json         # API配置
+├── src/                    # 源代码目录
+│   ├── index.ts           # 程序入口
+│   ├── utils/             # 核心工具模块 (17个文件)
+│   ├── plugin/            # 系统插件 (15个文件)
+│   └── hook/              # Hook系统
+├── plugins/               # 用户插件目录
+├── assets/                # 资源文件目录
+├── temp/                  # 临时文件目录
+├── logs/                  # 日志目录
+├── node_modules/          # NPM依赖包
+├── config.json            # Telegram API配置
+├── .env                   # 环境变量配置
+├── package.json          # 项目配置
+├── tsconfig.json         # TypeScript配置
+└── ecosystem.config.js   # PM2进程管理配置
+```
+
+### 核心模块
+
+#### 程序入口 (index.ts)
+
+```typescript
+import "dotenv/config";
+import { login } from "@utils/loginManager";
+import { loadPlugins } from "@utils/pluginManager";
+import { patchMsgEdit } from "hook/listen";
+import "./hook/patches/telegram.patch";
+
+async function run() {
+  await login();          // 登录Telegram
+  await loadPlugins();    // 加载插件
+}
+
+run();
+```
+
+**职责**：
+- 加载环境变量
+- 初始化Telegram客户端
+- 加载插件系统
+- 应用Hook补丁
+
+#### 工具模块 (utils/)
+
+17个核心工具文件：
+
+| 文件名 | 功能说明 |
+|--------|----------|
+| `pluginBase.ts` | 插件基类定义 |
+| `pluginManager.ts` | 插件管理器，负责加载和路由 |
+| `globalClient.ts` | 全局Telegram客户端实例 |
+| `loginManager.ts` | 登录管理器 |
+| `apiConfig.ts` | API配置管理 |
+| `pathHelpers.ts` | 路径辅助工具 |
+| `entityHelpers.ts` | Telegram实体处理工具 |
+| `aliasDB.ts` | 命令别名数据库 |
+| `sudoDB.ts` | 管理员权限数据库 |
+| `sureDB.ts` | 确认操作数据库 |
+| `sendLogDB.ts` | 发送日志数据库 |
+| `banUtils.ts` | 封禁管理工具 |
+| `cronManager.ts` | 定时任务管理器 |
+| `conversation.ts` | 对话管理器 |
+| `tlRevive.ts` | Telegram实体序列化工具 |
+| `npm_install.ts` | NPM包安装工具 |
+| `teleboxInfoHelper.ts` | 系统信息助手 |
+
+#### 系统插件 (plugin/)
+
+15个内置插件：
+
+| 插件名 | 功能说明 |
+|--------|----------|
+| `alias.ts` | 命令别名管理 |
+| `bf.ts` | 备份功能 |
+| `debug.ts` | 调试工具 |
+| `exec.ts` | 命令执行 |
+| `help.ts` | 帮助系统 |
+| `ping.ts` | 网络测试 |
+| `prefix.ts` | 前缀管理 |
+| `re.ts` | 消息复读 |
+| `reload.ts` | 热重载 |
+| `sendLog.ts` | 日志发送 |
+| `sudo.ts` | 权限管理 |
+| `sure.ts` | 确认操作 |
+| `sysinfo.ts` | 系统信息 |
+| `tpm.ts` | 插件包管理器 |
+| `update.ts` | 更新管理 |
+
+#### Hook系统 (hook/)
+
+- `listen.ts` - 消息监听器
+- `patches/` - Telegram API补丁
+- `types/` - 类型定义
+
+### 目录组织
+
+#### 源码目录结构
+
+```
+src/
+├── index.ts              # 程序入口
+├── utils/                # 工具模块
+│   ├── pluginBase.ts
+│   ├── pluginManager.ts
+│   └── ...
+├── plugin/               # 系统插件
+│   ├── help.ts
+│   ├── alias.ts
+│   └── ...
+└── hook/                 # Hook系统
+    ├── listen.ts
+    ├── patches/
+    └── types/
+```
+
+#### 插件目录结构
+
+```
+plugins/
+├── example.ts           # 用户插件
+├── another.ts
+└── .gitkeep
+```
+
+**规范**：
+- 文件命名：`snake_case.ts`
+- 导出方式：`export default new PluginClass()`
+- 加载顺序：用户插件 > 系统插件
+
+#### 资源目录结构
+
+```
+assets/
+├── plugin_name/         # 插件专用目录
+│   ├── data.json       # lowdb JSON数据库
+│   ├── config.json     # 配置文件
+│   └── media/          # 媒体文件
+└── .gitkeep
+
+temp/
+├── backup/             # 备份文件
+├── convert/            # 转换文件
+├── download/           # 下载文件
+└── upload/             # 上传文件
+
+logs/
+├── out.log            # 标准输出
+├── error.log          # 错误日志
+└── plugin.log         # 插件日志
+```
+
+### 模块依赖关系
+
+```
+index.ts
+  ├── loginManager → 登录Telegram
+  ├── pluginManager → 加载插件
+  │     ├── pluginBase → 插件基类
+  │     ├── plugins/* → 用户插件
+  │     └── src/plugin/* → 系统插件
+  └── hook/listen → 消息监听
+        └── patches → API补丁
+
+utils/* (工具模块)
+  ├── globalClient → Telegram客户端
+  ├── *DB.ts → 数据库操作
+  ├── cronManager → 定时任务
+  └── conversation → 对话管理
+```
+
+## 🔌 插件系统
+
+### 插件基类
+
+**实际实现** (`src/utils/pluginBase.ts`)：
+
+```typescript
+type CronTask = {
+  cron: string;
+  description: string;
+  handler: (client: TelegramClient) => Promise<void>;
+};
+
+abstract class Plugin {
+  name?: string;
+  ignoreEdited?: boolean = cmdIgnoreEdited;  // 默认从环境变量读取
+  
+  abstract description:
+    | string
+    | ((...args: any[]) => string | void)
+    | ((...args: any[]) => Promise<string | void>);
+  
+  abstract cmdHandlers: Record<
+    string,
+    (msg: Api.Message, trigger?: Api.Message) => Promise<void>
+  >;
+  
+  listenMessageHandlerIgnoreEdited?: boolean = true;
+  listenMessageHandler?: (
+    msg: Api.Message,
+    options?: { isEdited?: boolean }
+  ) => Promise<void>;
+  
+  eventHandlers?: Array<{
+    event?: any;
+    handler: (event: any) => Promise<void>;
+  }>;
+  
+  cronTasks?: Record<string, CronTask>;
+}
+```
+
+**字段说明**：
+- `name` - 插件名称，不填则自动使用文件名
+- `ignoreEdited` - 命令是否忽略编辑消息，默认从 `TB_CMD_IGNORE_EDITED` 环境变量读取
+- `description` - 插件描述，可以是字符串或函数
+- `cmdHandlers` - 命令处理器，必须实现
+- `listenMessageHandler` - 消息监听器，可选
+- `eventHandlers` - 事件处理器，可选
+- `cronTasks` - 定时任务，可选
+
+### 插件加载机制
+
+**加载流程** (`src/utils/pluginManager.ts`)：
+
+```typescript
+const USER_PLUGIN_PATH = path.join(process.cwd(), "plugins");
+const DEFAULT_PLUGIN_PATH = path.join(process.cwd(), "src", "plugin");
+
+// 1. 先加载用户插件
+await setPlugins(USER_PLUGIN_PATH);
+
+// 2. 再加载系统插件
+await setPlugins(DEFAULT_PLUGIN_PATH);
+```
+
+**加载规则**：
+1. 扫描目录下所有 `.ts` 文件
+2. 使用动态 `require` 加载模块
+3. 检查是否为有效的 `Plugin` 实例
+4. 注册命令到全局命令表
+5. 处理命令别名
+
+**优先级**：
+- 用户插件先加载，可以覆盖系统插件
+- 同名命令：后加载覆盖先加载
+- 监听器和事件处理器：全部执行，不互斥
+
+### 插件触发方式
+
+#### ⚠️ 安全边界声明
+
+**重要：为防止Telegram风控和滥用，必须明确各种触发器的边界**
+
+1. **命令处理器边界**
+   - ✅ 只能通过指定前缀触发（`.` `。` `$` 等）
+   - ✅ 必须明确命令开头，不能随意匹配
+   - ❌ 禁止监控所有消息内容
+
+2. **消息监听器限制**
+   - ⚠️ 禁止无目的监控全部聊天
+   - ✅ 必须有明确的业务需求和过滤条件
+   - ✅ 需要处理的消息类型必须明确限定
+   - ❌ 避免触发Telegram风控机制
+
+3. **事件处理器规范**
+   - ✅ 只处理必要的特定事件
+   - ❌ 不得滥用事件监听
+
+4. **定时任务约束**
+   - ✅ 控制执行频率，避免过度请求
+   - ❌ 不得在所有会话中随意发送消息
+
+#### 1. 命令处理器 (cmdHandlers)
+
+**触发条件**：
+- 仅当消息以配置的前缀开头时触发
+- 默认前缀：`.` `。` `$`
+- 开发环境前缀：`!` `！`
+- 通过 `TB_PREFIX` 环境变量自定义
+
+**示例**：
+```typescript
+cmdHandlers = {
+  help: async (msg: Api.Message) => {
+    // 只在用户输入 .help 时触发
+    await msg.reply({ message: "帮助信息" });
+  }
+};
+```
+
+#### 2. 消息监听器 (listenMessageHandler)
+
+**触发条件**：
+- 监听**所有消息**，不管是否有命令前缀
+- 可用于实现自动回复、内容过滤、统计等功能
+- 通过 `listenMessageHandlerIgnoreEdited` 控制是否忽略编辑消息
+
+**示例**：
+```typescript
+listenMessageHandler = async (msg: Api.Message, options?: { isEdited?: boolean }) => {
+  // 监听所有消息，必须有明确过滤条件
+  if (msg.photo) {
+    // 只处理图片消息
+    await handleImage(msg);
+  }
+};
+```
+
+**注意**：
+- 这是 `image_monitor` 插件“不用触发指令就触发”的原因
+- 必须有明确的过滤逻辑，不能对所有消息都处理
+
+#### 3. 事件处理器 (eventHandlers)
+
+**触发条件**：
+- 监听特定的 Telegram 事件
+- 如新成员加入、消息删除等
+
+**示例**：
+```typescript
+eventHandlers = [
+  {
+    event: new NewMessage({}),
+    handler: async (event) => {
+      // 处理新消息事件
+    }
+  }
+];
+```
+
+#### 4. 定时任务 (cronTasks)
+
+**触发条件**：
+- 按 cron 表达式定期执行
+- 用于定时清理、备份等任务
+
+**示例**：
+```typescript
+cronTasks = {
+  backup: {
+    cron: "0 0 * * *",  // 每天凌晨执行
+    description: "每日备份",
+    handler: async (client) => {
+      // 执行备份任务
+    }
+  }
+};
 ```
 
 
-## 核心依赖引用
+## 📦 核心工具模块
 
-### 🔧 内部模块
+TeleBox提供了17个核心工具模块，位于 `src/utils/` 目录。
+
+### 插件管理器
+
+**pluginManager.ts** - 插件系统的核心管理器
 
 ```typescript
-// 插件系统
-import { Plugin } from "@utils/pluginBase";
+import { 
+  getPrefixes,      // 获取命令前缀列表
+  setPrefixes,      // 设置命令前缀
+  loadPlugins,      // 加载所有插件
+  listCommands,     // 列出所有命令
+  getPluginEntry,   // 获取插件入口
+  getCommandFromMessage,           // 从消息中提取命令
+  dealCommandPluginWithMessage     // 处理命令消息
+} from "@utils/pluginManager";
+```
+
+**主要功能**：
+- 动态加载用户插件和系统插件
+- 命令路由和分发
+- 命令别名处理
+- 前缀管理
+
+### 全局客户端
+
+**globalClient.ts** - 全局Telegram客户端实例
+
+```typescript
 import { getGlobalClient } from "@utils/globalClient";
-import { getPrefixes, handleCommand, getCommandFromMessage, dealCommandPluginWithMessage } from "@utils/pluginManager";
 
-// 路径管理
-import { createDirectoryInAssets, createDirectoryInTemp } from "@utils/pathHelpers";
+const client = await getGlobalClient();
+// 使用client进行API调用
+await client.sendMessage(peer, { message: "Hello" });
+```
 
-// 实体处理  
-import { getEntityWithHash, parseEntityId, safeForwardMessage } from "@utils/entityHelpers";
+**作用**：维护全局唯一的Telegram客户端实例，避免重复连接。
 
-// 数据库
+### 数据库工具
+
+#### aliasDB.ts - 命令别名数据库
+
+```typescript
 import { AliasDB } from "@utils/aliasDB";
+
+const aliasDB = new AliasDB();
+aliasDB.set("h", "help");        // 设置别名
+aliasDB.getOriginal("h");        // 获取原命令
+```
+
+#### sudoDB.ts - 管理员权限数据库
+
+```typescript
 import { SudoDB } from "@utils/sudoDB";
+
+const sudoDB = new SudoDB();
+sudoDB.add(userId);              // 添加管理员
+sudoDB.has(userId);              // 检查权限
+```
+
+#### sureDB.ts - 确认操作数据库
+
+```typescript
 import { SureDB } from "@utils/sureDB";
+
+const sureDB = new SureDB();
+sureDB.set(userId, action);      // 设置待确认操作
+```
+
+#### sendLogDB.ts - 发送日志数据库
+
+```typescript
 import { SendLogDB } from "@utils/sendLogDB";
 
-// 封禁管理
-import { unbanUser, banUser, kickUser, getBannedUsers, batchUnbanUsers } from "@utils/banUtils";
+const sendLogDB = new SendLogDB();
+sendLogDB.add(messageId, data); // 记录发送日志
+```
 
-// 系统功能
-import { cronManager } from "@utils/cronManager";
-import { conversation } from "@utils/conversation";
+### 实体处理工具
+
+**entityHelpers.ts** - Telegram实体处理
+
+```typescript
+import { 
+  getEntityWithHash,    // 获取实体及其哈希
+  parseEntityId,        // 解析实体ID
+  safeForwardMessage    // 安全转发消息
+} from "@utils/entityHelpers";
+```
+
+**tlRevive.ts** - 实体序列化工具
+
+```typescript
 import { reviveEntities } from "@utils/tlRevive";
+
+// 将实体序列化后反序列化回来
+const entities = await reviveEntities(serializedData);
+```
+
+### 路径管理
+
+**pathHelpers.ts** - 路径辅助工具
+
+```typescript
+import { 
+  createDirectoryInAssets,  // 在assets目录创建子目录
+  createDirectoryInTemp     // 在temp目录创建子目录
+} from "@utils/pathHelpers";
+
+const dataDir = createDirectoryInAssets("myplugin");
+// 返回: /path/to/telebox/assets/myplugin
+```
+
+### 群组管理
+
+**banUtils.ts** - 封禁管理工具
+
+```typescript
+import { 
+  banUser,          // 封禁用户
+  unbanUser,        // 解封用户
+  kickUser,         // 踢出用户
+  getBannedUsers,   // 获取封禁列表
+  batchUnbanUsers   // 批量解封
+} from "@utils/banUtils";
+
+await banUser(client, chatId, userId);
+```
+
+### 系统功能
+
+**cronManager.ts** - 定时任务管理器
+
+```typescript
+import { cronManager } from "@utils/cronManager";
+
+cronManager.addTask("backup", {
+  cron: "0 0 * * *",
+  description: "每日备份",
+  handler: async (client) => {
+    // 执行任务
+  }
+});
+```
+
+**conversation.ts** - 对话管理器
+
+```typescript
+import { conversation } from "@utils/conversation";
+
+// 等待用户回复
+const response = await conversation.waitForMessage(userId, chatId);
+```
+
+**apiConfig.ts** - API配置管理
+
+```typescript
 import { apiConfig } from "@utils/apiConfig";
-import { loginManager } from "@utils/loginManager";
+
+const config = apiConfig.get(); // 获取config.json内容
 ```
 
-### 📦 Telegram API
+**loginManager.ts** - 登录管理器
 
 ```typescript
+import { login } from "@utils/loginManager";
+
+await login(); // 登录Telegram
+```
+
+**npm_install.ts** - NPM包安装工具
+
+```typescript
+import { npmInstall } from "@utils/npm_install";
+
+await npmInstall("package-name"); // 安装NPM包
+```
+
+**teleboxInfoHelper.ts** - 系统信息助手
+
+```typescript
+import { getTeleboxInfo } from "@utils/teleboxInfoHelper";
+
+const info = getTeleboxInfo(); // 获取TeleBox系统信息
+```
+
+## ⚙️ 环境配置
+
+### 必需配置文件
+
+#### config.json - Telegram API配置
+
+**作用**：存储Telegram API凭证和会话信息
+
+```json
+{
+  "api_id": 17759529,
+  "api_hash": "cf832d11ca514db19e4b85a96eb707b2",
+  "session": "session_string_here"
+}
+```
+
+**字段说明**：
+- `api_id` - Telegram API ID，从 https://my.telegram.org 获取
+- `api_hash` - Telegram API Hash
+- `session` - 会话字符串，首次登录后自动生成
+
+#### .env - 环境变量配置
+
+**作用**：配置TeleBox运行参数
+
+```bash
+# 命令前缀（空格分隔多个前缀）
+TB_PREFIX=". 。"
+
+# Sudo命令前缀（可选）
+TB_SUDO_PREFIX="# $"
+
+# 全局设置命令是否忽略编辑的消息
+TB_CMD_IGNORE_EDITED=false
+
+# 设置哪些插件的监听不忽略编辑的消息（空格分隔）
+TB_LISTENER_HANDLE_EDITED="sudo sure"
+```
+
+#### package.json - 项目配置
+
+**作用**：定义项目依赖和脚本命令
+
+```json
+{
+  "name": "telebox",
+  "version": "0.2.6",
+  "scripts": {
+    "start": "tsx -r tsconfig-paths/register ./src/index.ts",
+    "tpm": "tsx -r tsconfig-paths/register ./src/plugin/tpm.ts",
+    "dev": "NODE_ENV=development tsx -r tsconfig-paths/register ./src/index.ts"
+  },
+  "dependencies": {
+    "telegram": "^2.26.22",
+    "dotenv": "^17.2.2",
+    "cron": "^4.3.3",
+    "axios": "^1.11.0",
+    "sharp": "^0.34.3"
+    // ... 更多依赖见实际文件
+  }
+}
+```
+
+### 进程管理配置
+
+#### ecosystem.config.js - PM2配置
+
+**作用**：使用PM2进行进程管理和自动重启
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: "telebox",
+      script: "npm",
+      args: "start",
+      cwd: __dirname,
+      error_file: "./logs/error.log",
+      out_file: "./logs/out.log",
+      merge_logs: true,
+      time: true,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: "10s",
+      restart_delay: 4000,
+      env: {
+        NODE_ENV: "production"
+      }
+    }
+  ]
+}
+```
+
+**配置说明**：
+- `name` - 进程名称
+- `script` - 启动脚本（使用npm start）
+- `error_file` / `out_file` - 日志文件路径
+- `autorestart` - 自动重启
+- `max_restarts` - 最大重启次数
+- `restart_delay` - 重启延迟时间
+
+### 环境变量详解
+
+#### 命令前缀配置
+
+```bash
+# 生产环境命令前缀
+TB_PREFIX=". 。"
+
+# Sudo命令前缀（管理员专用）
+TB_SUDO_PREFIX="# $"
+```
+
+**说明**：
+- 支持多个前缀，用空格分隔
+- 常用前缀：`.` `。` `$` `!` `#`
+- Sudo前缀用于需要管理员权限的命令
+
+#### 插件行为配置
+
+```bash
+# 全局设置命令是否忽略编辑的消息
+TB_CMD_IGNORE_EDITED=false
+
+# 设置哪些插件的监听不忽略编辑的消息
+TB_LISTENER_HANDLE_EDITED="sudo sure"
+```
+
+**说明**：
+- `TB_CMD_IGNORE_EDITED` - 控制命令处理器是否响应编辑后的消息
+- `TB_LISTENER_HANDLE_EDITED` - 指定哪些插件的监听器处理编辑消息
+- 用空格分隔多个插件名
+
+#### 开发模式配置
+
+```bash
+# 使用开发模式启动
+NODE_ENV=development
+```
+
+**启动方式**：
+```bash
+# 生产模式
+npm start
+
+# 开发模式
+npm run dev
+```
+
+### 配置文件示例
+
+#### .env 完整示例
+
+```bash
+# 命令前缀配置
+TB_PREFIX=". 。"
+TB_SUDO_PREFIX="# $"
+
+# 插件行为配置
+TB_CMD_IGNORE_EDITED=false
+TB_LISTENER_HANDLE_EDITED="sudo sure"
+
+# 开发模式（可选）
+# NODE_ENV=development
+```
+
+#### config.json 示例
+
+```json
+{
+  "api_id": 12345678,
+  "api_hash": "your_api_hash_here",
+  "session": "your_session_string_here"
+}
+```
+
+**获取API凭证**：
+1. 访问 https://my.telegram.org
+2. 登录Telegram账号
+3. 进入 "API development tools"
+4. 创建应用获取 api_id 和 api_hash
+
+## 🔧 系统插件说明
+
+TeleBox内置15个系统插件，位于 `src/plugin/` 目录。
+
+### 基础功能插件
+
+#### help - 帮助系统
+
+**文件**: `src/plugin/help.ts`
+
+**功能**：
+- 显示所有可用命令列表
+- 自动读取插件描述
+- 显示TeleBox版本信息
+- 智能命令分组显示
+
+**命令**：
+```
+.help              # 显示所有命令
+.help [命令名]     # 显示特定命令的帮助
+```
+
+#### alias - 命令别名
+
+**文件**: `src/plugin/alias.ts`
+
+**功能**：
+- 为命令设置自定义别名
+- 别名数据持久化存储
+- 支持查看、设置、删除别名
+
+**命令**：
+```
+.alias set [别名] [原命令]   # 设置别名
+.alias del [别名]            # 删除别名
+.alias list                  # 列出所有别名
+```
+
+#### sudo - 权限管理
+
+**文件**: `src/plugin/sudo.ts`
+
+**功能**：
+- 管理管理员用户列表
+- 权限验证
+- 支持添加、删除、查看管理员
+
+**命令**：
+```
+.sudo add [用户ID]    # 添加管理员
+.sudo del [用户ID]    # 删除管理员
+.sudo list            # 列出所有管理员
+```
+
+#### debug - 调试工具
+
+**文件**: `src/plugin/debug.ts`
+
+**功能**：
+- 获取用户、群组、频道详细信息
+- 消息调试
+- 实体信息查询
+
+**命令**：
+```
+.id           # 获取当前对话或回复消息的ID
+.entity       # 获取实体详细信息
+.msg          # 获取消息完整数据
+```
+
+#### sure - 确认操作
+
+**文件**: `src/plugin/sure.ts`
+
+**功能**：
+- 危险操作二次确认
+- 防止误操作
+- 超时自动取消
+
+**使用方式**：其他插件调用SureDB进行确认
+
+### 系统管理插件
+
+#### sysinfo - 系统信息
+
+**文件**: `src/plugin/sysinfo.ts`
+
+**功能**：
+- 显示TeleBox运行状态
+- CPU、内存、磁盘使用情况
+- 系统版本信息
+
+**命令**：
+```
+.sysinfo      # 显示系统信息
+```
+
+#### update - 更新管理
+
+**文件**: `src/plugin/update.ts`
+
+**功能**：
+- 从Git拉取最新代码
+- 自动安装依赖
+- 重启TeleBox
+
+**命令**：
+```
+.update       # 普通更新
+.update -f    # 强制更新（覆盖本地修改）
+```
+
+#### bf - 备份管理
+
+**文件**: `src/plugin/bf.ts`
+
+**功能**：
+- 备份TeleBox所有数据
+- 恢复历史备份
+- 压缩备份文件
+- 支持定时备份
+
+**命令**：
+```
+.bf           # 创建备份
+.hf           # 恢复备份（从最新备份恢复）
+```
+
+#### tpm - TeleBox插件包管理器
+
+**文件**: `src/plugin/tpm.ts`
+
+**功能**：
+- 安装、卸载、更新插件包
+- 从NPM或Git仓库安装插件
+- 插件依赖管理
+- 插件搜索
+
+**命令**：
+```
+.tpm i [插件名]           # 安装插件
+.tpm rm [插件名]          # 卸载插件
+.tpm ls                   # 列出已安装插件
+.tpm search [关键词]      # 搜索插件
+.tpm update [插件名]      # 更新插件
+```
+
+### 开发工具插件
+
+#### exec - 命令执行
+
+**文件**: `src/plugin/exec.ts`
+
+**功能**：
+- 执行Shell命令
+- 显示命令输出
+- 错误处理
+
+**命令**：
+```
+.exec [shell命令]    # 执行Shell命令
+```
+
+⚠️ **安全警告**：此插件具有系统级权限，请谨慎使用
+
+#### reload - 热重载
+
+**文件**: `src/plugin/reload.ts`
+
+**功能**：
+- 重新加载插件
+- 无需重启TeleBox
+- 用于插件开发调试
+
+**命令**：
+```
+.reload [插件名]     # 重载指定插件
+.reload              # 重载所有插件
+```
+
+#### sendLog - 日志发送
+
+**文件**: `src/plugin/sendLog.ts`
+
+**功能**：
+- 发送系统日志文件
+- 查看错误日志
+- 调试问题
+
+**命令**：
+```
+.log          # 发送日志文件
+.errlog       # 发送错误日志
+```
+
+### 实用工具插件
+
+#### ping - 网络测试
+
+**文件**: `src/plugin/ping.ts`
+
+**功能**：
+- 测试网络延迟
+- 检测Telegram API连接
+- 显示响应时间
+
+**命令**：
+```
+.ping         # 测试延迟
+```
+
+#### prefix - 前缀管理
+
+**文件**: `src/plugin/prefix.ts`
+
+**功能**：
+- 动态修改命令前缀
+- 查看当前前缀
+- 支持多前缀
+
+**命令**：
+```
+.prefix               # 查看当前前缀
+.prefix set [前缀]    # 设置前缀
+```
+
+#### re - 消息复读
+
+**文件**: `src/plugin/re.ts`
+
+**功能**：
+- 复读回复的消息
+- 转发消息
+
+**命令**：
+```
+.re           # 复读回复的消息
+```
+
+## 🎯 用户插件示例
+
+`plugins/` 目录包含21个用户插件示例，展示了TeleBox的各种功能实现。
+
+### 群组管理类
+
+#### aban - 自动封禁管理
+
+**文件**: `plugins/aban.ts`
+
+**功能**：
+- 自动检测并封禁违规用户
+- 支持关键词过滤
+- 支持白名单机制
+- 批量解封功能
+- 使用lowdb存储封禁记录
+
+#### clean_member - 成员清理
+
+**文件**: `plugins/clean_member.ts`
+
+**功能**：
+- 清理僵尸粉、删除号
+- 批量踢出长期不活跃成员
+- 支持自定义清理规则
+- 成员活跃度分析
+
+#### pmcaptcha - 私聊验证码
+
+**文件**: `plugins/pmcaptcha.ts`
+
+**功能**：
+- 防止私聊骚扰
+- 多种验证方式（算术、图片等）
+- 自动封禁失败用户
+- 验证超时管理
+
+#### dme - 消息批量管理
+
+**文件**: `plugins/dme.ts`
+
+**功能**：
+- 批量删除消息
+- 消息过滤和筛选
+- 支持按时间范围删除
+
+#### da - 批量删除
+
+**文件**: `plugins/da.ts`
+
+**功能**：
+- 启动/停止批量删除任务
+- 删除进度追踪
+- 任务状态管理
+
+#### sunremove - 太阳图标清理
+
+**文件**: `plugins/sunremove.ts`
+
+**功能**：
+- 清理特定图标或标记
+- 自动检测和删除
+
+### 搜索与查询类
+
+#### ddg - DuckDuckGo搜索
+
+**文件**: `plugins/ddg.ts`
+
+**功能**：
+- DuckDuckGo搜索引擎集成
+- 免配置，开箱即用
+- 搜索结果格式化显示
+
+#### soutu - 搜图
+
+**文件**: `plugins/soutu.ts`
+
+**功能**：
+- 以图搜图
+- 支持多个搜图引擎
+- 图片相似度搜索
+
+#### rate - 汇率查询
+
+**文件**: `plugins/rate.ts`
+
+**功能**：
+- 实时汇率转换
+- 支持多种货币
+- 历史汇率查询
+- 汇率走势图表
+
+### 开发工具类
+
+#### git_PR - GitHub PR管理
+
+**文件**: `plugins/git_PR.ts`
+
+**功能**：
+- GitHub Pull Request管理
+- PR创建和更新
+- 代码审查助手
+
+#### his - 历史记录
+
+**文件**: `plugins/his.ts`
+
+**功能**：
+- 命令历史记录
+- 历史查询和回放
+- 历史搜索
+
+### 媒体处理类
+
+#### image_monitor - 图片监控
+
+**文件**: `plugins/image_monitor.ts`
+
+**功能**：
+- 自动监听群组图片
+- 支持图片自动保存
+- 支持图片内容识别
+- **无需命令触发，自动工作**
+- 使用消息监听器实现
+
+#### music - 音乐搜索下载
+
+**文件**: `plugins/music.ts`
+
+**功能**：
+- 支持多平台音乐搜索
+- 高品质音乐下载
+- 歌词同步下载
+- 播放列表管理
+
+#### music_bot - 音乐Bot集成
+
+**文件**: `plugins/music_bot.ts`
+
+**功能**：
+- 与音乐Bot交互
+- 自动下载音乐
+- Bot命令转发
+
+### 网络工具类
+
+#### speedtest - 网速测试
+
+**文件**: `plugins/speedtest.ts`
+
+**功能**：
+- 测试服务器网速
+- 支持多个测速节点
+- 详细的网络诊断信息
+- 上传/下载速度测试
+
+#### warp - Cloudflare WARP管理
+
+**文件**: `plugins/warp.ts`
+
+**功能**：
+- Cloudflare WARP配置管理
+- VPN连接控制
+- 网络状态监控
+
+#### ssh - SSH远程管理
+
+**文件**: `plugins/ssh.ts`
+
+**功能**：
+- 远程服务器管理
+- 支持多服务器配置
+- 安全的密钥管理
+- SSH命令执行
+
+### 高级功能类
+
+#### shift - 任务调度系统
+
+**文件**: `plugins/shift.ts`
+
+**功能**：
+- 复杂任务编排
+- 支持任务依赖
+- 任务状态监控
+- 定时任务管理
+
+#### sub - 订阅管理
+
+**文件**: `plugins/sub.ts`
+
+**功能**：
+- RSS订阅推送
+- 自定义订阅源
+- 定时推送配置
+- 订阅内容过滤
+
+#### gt - Google翻译
+
+**文件**: `plugins/gt.ts`
+
+**功能**：
+- Google翻译集成
+- 多语言翻译支持
+- 自动语言检测
+
+#### ids - ID查询
+
+**文件**: `plugins/ids.ts`
+
+**功能**：
+- 用户/群组ID查询
+- 多目标ID批量查询
+- ID信息导出
+
+## 📝 插件开发框架
+
+### 常用工具函数
+
+```typescript
+import { getPrefixes } from "@utils/pluginManager";
 import { Api } from "telegram";
-import { CustomFile } from "telegram/client/uploads.js";
-import { sleep } from "telegram/Helpers";
-import { NewMessage } from "telegram/events";
-import { BigInteger } from "big-integer";
-```
 
-### 📦 内置依赖库
-
-```typescript
-// 网络请求
-import axios from "axios";
-
-// 工具库
-import _ from "lodash";
-import dayjs from "dayjs";
-import * as cron from "cron";
-
-// 图像处理
-import sharp from "sharp";
-
-// 数据库
-import Database from "better-sqlite3";
-import { JSONFilePreset } from "lowdb/node";
-
-// 文件系统
-import * as fs from "fs";
-import * as path from "path";
-import archiver from "archiver";
-
-// HTML解析
-import * as cheerio from "cheerio";
-
-// 媒体处理
-import { GifReader, GifWriter } from "modern-gif";
-
-// 中文处理
-import OpenCC from "opencc-js";
-
-// 动态导入（按需使用）
-// const translateModule = await import("@vitalets/google-translate-api");
-```
-
-### 必需工具函数
-
-```typescript
-// HTML转义（每个插件必须实现）
+// HTML转义（必需）
 const htmlEscape = (text: string): string => 
   text.replace(/[&<>"']/g, m => ({ 
     '&': '&amp;', '<': '&lt;', '>': '&gt;', 
     '"': '&quot;', "'": '&#x27;' 
   }[m] || m));
 
-// 获取命令前缀
+// 获取前缀
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
 
-// 动态插件管理
-function dynamicRequireWithDeps(filePath: string): any;
-function setPlugins(basePath: string): Promise<void>;
-function loadPlugin(pluginPath: string): Promise<void>;
-function unloadPlugin(commandName: string): void;
-function reloadPlugin(commandName: string): Promise<void>;
+// 参数解析
+const parseArgs = (msg: Api.Message) => {
+  const text = msg.text || "";
+  const parts = text.trim().split(/\s+/);
+  return parts.slice(1); // 跳过命令本身
+};
 
-// 提取命令参数（跳过前n个参数）
-function getRemarkFromMsg(msg: Api.Message | string, n: number): string {
-  return (typeof msg === "string" ? msg : msg?.message || "")
-    .replace(new RegExp(`^\\S+${Array(n).fill("\\s+\\S+").join("")}`), "")
-    .trim();
-}
+// 提取剩余文本
+const getRemark = (msg: Api.Message, skipWords: number = 1): string => {
+  const text = msg.text || "";
+  const parts = text.trim().split(/\s+/);
+  return parts.slice(skipWords).join(" ");
+};
 
-// 类型转换
-function toInt(value: any): number | undefined {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.trunc(n) : undefined;
-}
+// 错误处理
+const handleError = async (msg: Api.Message, error: any) => {
+  const errorMsg = error.message || "未知错误";
+  await msg.edit({
+    text: `❌ <b>错误:</b> ${htmlEscape(errorMsg)}`,
+    parseMode: "html"
+  });
+};
 
-function toStrInt(value: any): string | undefined {
-  const n = Number(value);
-  return Number.isFinite(n) ? String(Math.trunc(n)) : undefined;
-}
-
-// 时区处理
-const CN_TIME_ZONE = "Asia/Shanghai";
-function formatDate(date: Date): string {
-  return date.toLocaleString("zh-CN", { timeZone: CN_TIME_ZONE });
-}
+// 自动删除消息
+const autoDelete = (msg: Api.Message, seconds: number = 5) => {
+  setTimeout(() => msg.delete({ revoke: true }).catch(() => {}), seconds * 1000);
+};
 ```
 
-## 核心API签名
+## 🔍 核心API签名
 
-### Plugin 基类（实际实现）
+### 消息限制
+
+**Telegram消息最大 4096 字符**：
+- 超过限制会抛出 `MESSAGE_TOO_LONG` 错误
+- HTML 标签也计入字符数
+- 需要分割长消息或使用文件发送
 
 ```typescript
-// 🎨 现代化的插件抽象类设计
-abstract class Plugin {
-  // 📝 必需属性 - 插件描述（支持动态生成）
-  abstract description:
-    | string
-    | ((...args: any[]) => string | void)
-    | ((...args: any[]) => Promise<string | void>);
-    
-  // ⚡ 必需属性 - 命令处理器映射表
-  abstract cmdHandlers: Record<
-    string,
-    (msg: Api.Message, trigger?: Api.Message) => Promise<void>
-  >;
-  
-  // 👂 可选属性 - 消息监听器
-  listenMessageHandler?: (msg: Api.Message) => Promise<void>;
-  
-  // 🎯 可选属性 - 事件处理器
-  eventHandlers?: Array<{
-    event?: any;
-    handler: (event: any) => Promise<void>;
-  }>;
-  
-  // ⏰ 可选属性 - 定时任务
-  cronTasks?: Record<string, {
-    cron: string;
-    description: string;
-    handler: (client: TelegramClient) => Promise<void>;
-  }>;
-  
-  // 🚫 可选属性 - 忽略编辑消息（默认: true）
-  ignoreEdited?: boolean;
-}
+const MAX_MESSAGE_LENGTH = 4096;
 
-// ⚠️ 重要说明：
-// 1. description 和 cmdHandlers 是 abstract，必须在子类中实现
-// 2. cmdHandlers 支持可选的 trigger 参数，用于处理触发消息
-// 3. eventHandlers 是新增的扩展功能，用于处理 Telegram 事件
-// 4. ignoreEdited 控制是否忽略编辑消息事件，默认为 true（推荐）
+// 消息分割
+function splitMessage(text: string, maxLength = 4096): string[] {
+  if (text.length <= maxLength) return [text];
+  
+  const parts: string[] = [];
+  let current = "";
+  
+  for (const line of text.split("\n")) {
+    if (current.length + line.length + 1 > maxLength) {
+      parts.push(current);
+      current = line;
+    } else {
+      current += (current ? "\n" : "") + line;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
 ```
 
 ### Message API
 
-#### ⚠️ Telegram 消息限制
-
-**每条消息最大 4096 字符：**
-- 超过限制会抛出 `MESSAGE_TOO_LONG` 错误
-- 需要分割长消息或使用文件发送
-- HTML 标签也计入字符数
-
 ```typescript
-// 消息长度检查和分割
-const MAX_MESSAGE_LENGTH = 4096;
+// 消息操作
+await msg.edit({ text: "...", parseMode: "html" });
+await msg.reply({ message: "..." });
+await msg.delete({ revoke: true });
 
-function splitMessage(text: string): string[] {
-  if (text.length <= MAX_MESSAGE_LENGTH) {
-    return [text];
-  }
-  
-  const parts: string[] = [];
-  let currentPart = "";
-  const lines = text.split("\n");
-  
-  for (const line of lines) {
-    if (currentPart.length + line.length + 1 > MAX_MESSAGE_LENGTH) {
-      parts.push(currentPart);
-      currentPart = line;
-    } else {
-      currentPart += (currentPart ? "\n" : "") + line;
-    }
-  }
-  
-  if (currentPart) {
-    parts.push(currentPart);
-  }
-  
-  return parts;
-}
-
-// 发送长消息
-async function sendLongMessage(msg: Api.Message, text: string) {
-  const parts = splitMessage(text);
-  
-  if (parts.length === 1) {
-    await msg.edit({ text: parts[0], parseMode: "html" });
-  } else {
-    // 编辑第一部分
-    await msg.edit({ 
-      text: parts[0] + "\n\n📄 (1/" + parts.length + ")", 
-      parseMode: "html" 
-    });
-    
-    // 发送剩余部分
-    for (let i = 1; i < parts.length; i++) {
-      await msg.reply({ 
-        message: parts[i] + "\n\n📄 (" + (i + 1) + "/" + parts.length + ")",
-        parseMode: "html" 
-      });
-    }
-  }
-}
+// 获取回复消息
+const replyMsg = await msg.getReplyMessage();
 ```
 
-#### Message 接口定义
+### Client API
 
 ```typescript
-interface Api.Message {
-  id: number;
-  peerId: Api.TypePeer;
-  senderId?: BigInteger;
-  text?: string;
-  message?: string;
-  media?: Api.TypeMessageMedia;
-  entities?: Api.TypeMessageEntity[];
-  replyTo?: Api.MessageReplyHeader;
-  groupedId?: BigInteger;
-  
-  // Methods
-  edit(params: { text?: string; parseMode?: string }): Promise<Api.Message>;
-  reply(params: { message: string; parseMode?: string }): Promise<Api.Message>;
-  delete(params?: { revoke?: boolean }): Promise<void>;
-  getReplyMessage(): Promise<Api.Message | undefined>;
-  downloadMedia(): Promise<Buffer | undefined>;
-  getSender(): Promise<Api.User | Api.Chat | undefined>;
-}
-```
+import { getGlobalClient } from "@utils/globalClient";
 
-### 数据库 API
-
-#### ⚠️ 数据库使用优先级
-
-**优先使用 lowdb，特别是配置和Cookie类数据：**
-- lowdb 自动保存，简单易用
-- 适合配置、Cookie、用户偏好等数据
-- 支持自动持久化，无需手动管理事务
-
-```typescript
-// ✅ 推荐：使用 lowdb 存储配置（扁平化结构）
-import { JSONFilePreset } from "lowdb/node";
-import * as path from "path";
-import { createDirectoryInAssets } from "@utils/pathHelpers";
-
-// 配置键定义
-const CONFIG_KEYS = {
-  API_KEY: "plugin_api_key",
-  COOKIE: "plugin_cookie", 
-  PROXY: "plugin_proxy",
-  BASE_URL: "plugin_base_url",
-  SETTING1: "plugin_setting1"
-};
-
-// 默认配置（扁平化结构）
-const DEFAULT_CONFIG: Record<string, string> = {
-  [CONFIG_KEYS.API_KEY]: "",
-  [CONFIG_KEYS.COOKIE]: "",
-  [CONFIG_KEYS.PROXY]: "",
-  [CONFIG_KEYS.BASE_URL]: "https://api.example.com",
-  [CONFIG_KEYS.SETTING1]: "default_value"
-};
-
-// 配置管理器类
-class ConfigManager {
-  private static db: any = null;
-  private static initialized = false;
-  private static configPath: string;
-
-  private static async init(): Promise<void> {
-    if (this.initialized) return;
-
-    try {
-      // 使用插件专用目录
-      this.configPath = path.join(
-        createDirectoryInAssets("plugin_name"),
-        "plugin_config.json"
-      );
-
-      // 以扁平结构初始化
-      this.db = await JSONFilePreset<Record<string, any>>(
-        this.configPath,
-        { ...DEFAULT_CONFIG }
-      );
-      this.initialized = true;
-    } catch (error) {
-      console.error("[plugin] 初始化配置失败:", error);
-    }
-  }
-
-  static async get(key: string, defaultValue?: string): Promise<string> {
-    await this.init();
-    if (!this.db) return defaultValue || DEFAULT_CONFIG[key] || "";
-
-    // 直接从顶级键读取
-    const value = this.db.data[key];
-    return value ?? defaultValue ?? DEFAULT_CONFIG[key] ?? "";
-  }
-
-  static async set(key: string, value: string): Promise<boolean> {
-    await this.init();
-    if (!this.db) return false;
-
-    try {
-      this.db.data[key] = value;
-      await this.db.write();
-      return true;
-    } catch (error) {
-      console.error(`[plugin] 设置配置失败 ${key}:`, error);
-      return false;
-    }
-  }
-
-  static async remove(key: string): Promise<boolean> {
-    await this.init();
-    if (!this.db) return false;
-
-    try {
-      delete this.db.data[key];
-      await this.db.write();
-      return true;
-    } catch (error) {
-      console.error(`[plugin] 删除配置失败 ${key}:`, error);
-      return false;
-    }
-  }
-}
-
-// 使用示例
-// 设置配置
-await ConfigManager.set(CONFIG_KEYS.API_KEY, "your_api_key");
-
-// 读取配置
-const apiKey = await ConfigManager.get(CONFIG_KEYS.API_KEY);
-const cookie = await ConfigManager.get(CONFIG_KEYS.COOKIE);
-```
-
-#### SQLite（用于大量数据或复杂查询）
-
-```typescript
-// 仅在需要复杂查询或大量数据时使用
-const db = new Database(dbPath);
-db.prepare(sql: string): Statement;
-db.exec(sql: string): void;
-db.transaction(fn: Function): Function;
-
-// 内置数据库
-const aliasDB = new AliasDB();
-aliasDB.setAlias(alias: string, command: string): void;
-aliasDB.getCommand(alias: string): string | null;
-
-const sudoDB = new SudoDB();
-sudoDB.isSudoUser(userId: string): Promise<boolean>;
-sudoDB.addSudoUser(userId: string): void;
-
-const sureDB = new SureDB();
-sureDB.addConfirmation(msgId: string, handler: Function): void;
-sureDB.getConfirmation(msgId: string): Function | null;
-```
-
-### 客户端 API
-
-```typescript
 const client = await getGlobalClient();
 
-// 消息操作
-client.sendMessage(peer, { message, parseMode });
-client.editMessage(peer, { message: msgId, text, parseMode });
-client.deleteMessages(peer, messageIds, { revoke });
-client.getMessages(peer, { limit, offsetId, reverse });
+// 发送消息
+await client.sendMessage(peer, { message: "...", parseMode: "html" });
 
-// 文件操作
-client.sendFile(peer, { file, caption, parseMode });
-client.downloadMedia(message, { outputFile });
-
-// 实体操作
-client.getEntity(peer): Promise<Entity>;
-client.getInputEntity(peer): Promise<InputPeer>;
-client.getDialogs({ limit, offsetDate });
-client.iterDialogs({ limit });
-
-// 调用原始API
-client.invoke(request: Api.AnyRequest): Promise<any>;
-```
-
-### 实体处理 API
-
-```typescript
 // 获取实体
-getEntityWithHash(client, peer): Promise<{ entity, hash }>;
-parseEntityId(id: string): { type: string, id: BigInteger };
-safeForwardMessage(client, fromPeer, toPeer, msgIds): Promise<void>;
+const entity = await client.getEntity(peer);
 
-// 格式化实体
-formatEntity(target, mention?: boolean): Promise<{
-  id: BigInteger;
-  entity: Entity;
-  display: string;
-}>;
+// 发送文件
+await client.sendFile(peer, { file: "path/to/file" });
 ```
 
-### 频道ID处理（xream改进）
+### Database API
+
+**⚠️ 重要：TeleBox只使用 lowdb 作为数据库**
 
 ```typescript
-// 处理频道ID的新方法（更可靠）
-function processChannelId(id: string | number): string {
-  // 旧方法：-1000000000000 减法处理不可靠
-  // 新方法：添加 -100 前缀
-  if (typeof id === 'string' && id.startsWith('-100')) {
-    return id;
-  }
-  return `-100${Math.abs(Number(id))}`;
+import { JSONFilePreset } from "lowdb/node";
+import { createDirectoryInAssets } from "@utils/pathHelpers";
+import * as path from "path";
+
+// 初始化数据库
+const dbPath = path.join(createDirectoryInAssets("plugin_name"), "data.json");
+const db = await JSONFilePreset(dbPath, { users: [], config: {} });
+
+// 读取数据
+const users = db.data.users;
+
+// 修改数据
+db.data.users.push({ id: "123", name: "Alice" });
+await db.write();
+```
+
+## 开发指南
+
+### 📚 帮助文档生成器
+
+```typescript
+// ========== 帮助文档模块化框架 ==========
+
+interface CommandInfo {
+  command: string;
+  description: string;
+  usage?: string;
+  example?: string;
 }
 
-// 获取实体时防止失败
-async function safeGetEntity(client: TelegramClient, peer: any) {
-  try {
-    // 每次执行前先刷新对话列表
-    await client.getDialogs({ limit: 100 });
-    return await client.getEntity(peer);
-  } catch (error) {
-    console.error("获取实体失败:", error);
-    return null;
+interface HelpConfig {
+  title: string;
+  icon?: string;
+  commands: CommandInfo[];
+  footer?: string;
+}
+
+// 帮助文档生成器
+class HelpBuilder {
+  static build(config: HelpConfig): string {
+    const { title, icon = "📋", commands, footer } = config;
+    const prefix = getPrefixInfo().display;
+    
+    let help = `${icon} <b>${title}</b>\n\n`;
+    
+    if (commands.length > 0) {
+      help += `<b>命令：</b>\n`;
+      for (const cmd of commands) {
+        help += `• <code>${prefix}${cmd.command}</code> - ${cmd.description}\n`;
+        if (cmd.usage) {
+          help += `  用法: <code>${cmd.usage}</code>\n`;
+        }
+        if (cmd.example) {
+          help += `  示例: <code>${cmd.example}</code>\n`;
+        }
+      }
+    }
+    
+    if (footer) {
+      help += `\n${footer}`;
+    }
+    
+    return help;
+  }
+  
+  // 生成子命令帮助
+  static buildSubCommand(mainCmd: string, subCommands: CommandInfo[]): string {
+    const prefix = getPrefixInfo().display;
+    let help = `<b>子命令：</b>\n`;
+    
+    for (const sub of subCommands) {
+      help += `• <code>${prefix}${mainCmd} ${sub.command}</code> - ${sub.description}\n`;
+    }
+    
+    return help;
   }
 }
+
+// ========== 使用示例 ==========
+
+// 方式1：简单插件
+const SIMPLE_HELP = HelpBuilder.build({
+  title: "示例插件",
+  commands: [
+    { command: "example", description: "执行示例" },
+    { command: "example help", description: "显示帮助" }
+  ]
+});
+
+// 方式2：复杂插件
+const COMPLEX_HELP = HelpBuilder.build({
+  title: "高级插件",
+  icon: "🚀",
+  commands: [
+    { 
+      command: "adv query <keyword>", 
+      description: "查询数据",
+      usage: "adv query [关键词]",
+      example: "adv query test"
+    },
+    { 
+      command: "adv process", 
+      description: "处理数据" 
+    },
+    { 
+      command: "adv config", 
+      description: "配置设置" 
+    },
+    { 
+      command: "adv help", 
+      description: "显示帮助" 
+    }
+  ],
+  footer: "💡 使用 <code>.adv help [子命令]</code> 查看详细帮助"
+});
+
 ```
 
-### 路径管理 API
+### 🎨 标准插件开发模板
 
 ```typescript
-createDirectoryInAssets(name: string): string;
-createDirectoryInTemp(name: string): string;
-getAssetsPath(): string;
-getTempPath(): string;
-```
+// ========== 插件基础框架 ==========
 
-### 定时任务 API
+import { Plugin } from "@utils/pluginBase";
+import { Api } from "telegram";
+import { getGlobalClient } from "@utils/globalClient";
 
-```typescript
-cronManager.addTask(name: string, schedule: string, handler: Function);
-cronManager.removeTask(name: string);
-cronManager.listTasks(): string[];
-
-// Cron表达式
-// "0 0 * * *"     每天0点
-// "*/5 * * * *"   每5分钟
-// 标准参数解析模式
-const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
-const parts = lines?.[0]?.split(/\s+/) || [];
-const [, ...args] = parts; // 跳过命令本身
-const sub = (args[0] || "").toLowerCase();
-
-// 无参数时的处理（根据插件功能自定义默认行为）
-if (!sub) {
-  // 示例：可以显示帮助、执行默认操作或提示参数不足
-  // 具体行为根据插件实际需求决定
-  await msg.edit({
-    text: `❌ <b>参数不足</b>\n\n💡 使用 <code>${mainPrefix}${pluginName} help</code> 查看帮助`,
-    parseMode: "html"
+class StandardPlugin extends Plugin {
+  // 插件配置
+  private readonly PLUGIN_NAME = "myplugin";
+  private readonly PLUGIN_VERSION = "1.0.0";
+  
+  // 生成帮助文档
+  private readonly HELP = HelpBuilder.build({
+    title: "我的插件",
+    icon: "📦",
+    commands: [
+      { command: "mp start", description: "开始任务" },
+      { command: "mp stop", description: "停止任务" },
+      { command: "mp status", description: "查看状态" },
+      { command: "mp help", description: "显示帮助" }
+    ]
   });
-  return;
-}
-
-// 处理 help 在前的情况：.cmd help [subcommand]
-if (sub === "help" || sub === "h") {
-  if (args[1]) {
-    // 显示特定子命令的帮助
-    const subCmd = args[1].toLowerCase();
-    await this.showSubCommandHelp(subCmd, msg);
-  } else {
-    // 显示总帮助
-    await msg.edit({ text: help_text, parseMode: "html" });
-  }
-  return;
-}
-
-// 处理 help 在后的情况：.cmd [subcommand] help
-if (args[1] && (args[1].toLowerCase() === "help" || args[1].toLowerCase() === "h")) {
-  await this.showSubCommandHelp(sub, msg);
-  return;
-}
-
-// 处理具体的子命令
-switch (sub) {
-  case "search":
-  case "s":
-    // 搜索逻辑
-    break;
-  case "config":
-    // 配置逻辑
-    break;
-  default:
-    // 未知命令或默认行为
-    await msg.edit({
-      text: `❌ <b>未知命令:</b> <code>${htmlEscape(sub)}</code>\n\n💡 使用 <code>${mainPrefix}${pluginName} help</code> 查看帮助`,
-      parseMode: "html"
-    });
-}
-```
-
-### 完整的参数解析示例
-```typescript
-// 必须定义 help_text
-const help_text = `📋 <b>示例插件</b>
-
-<b>命令：</b>
-• <code>.example query</code> - 查询数据
-• <code>.example process</code> - 处理数据
-• <code>.example help</code> - 显示帮助`;
-
-class ExamplePlugin extends Plugin {
-  // 必须在 description 中引用 help_text
-  description: string = `示例插件\n\n${help_text}`;
   
-  // 推荐设置：忽略编辑消息（默认为 true）
-  ignoreEdited: boolean = true;
+  // 插件描述
+  description = this.HELP;
   
+  // 命令处理器
   cmdHandlers = {
-    example: async (msg: Api.Message) => {
-      const client = await getGlobalClient();
-      if (!client) {
-        await msg.edit({ text: "❌ 客户端未初始化", parseMode: "html" });
-        return;
-      }
-
-      // 标准参数解析
-      const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
-      const parts = lines?.[0]?.split(/\s+/) || [];
-      const [, ...args] = parts;
-      const sub = (args[0] || "").toLowerCase();
-
-      try {
-        // 无参数时显示错误提示
-        if (!sub) {
-          await msg.edit({
-            text: `❌ <b>参数不足</b>\n\n💡 使用 <code>${mainPrefix}example help</code> 查看帮助`,
-            parseMode: "html"
-          });
-          return;
-        }
-
-        // 处理 help 在前的情况：.example help [subcommand]
-        if (sub === "help" || sub === "h") {
-          if (args[1]) {
-            // 显示特定子命令的帮助
-            const subCmd = args[1].toLowerCase();
-            if (subCmd === "query") {
-              await msg.edit({ 
-                text: `📖 <b>查询命令帮助</b>\n\n<code>${mainPrefix}example query &lt;关键词&gt;</code> - 查询数据`,
-                parseMode: "html" 
-              });
-            } else if (subCmd === "process") {
-              await msg.edit({ 
-                text: `📖 <b>处理命令帮助</b>\n\n<code>${mainPrefix}example process &lt;数据&gt;</code> - 处理数据`,
-                parseMode: "html" 
-              });
-            } else {
-              await msg.edit({ text: help_text, parseMode: "html" });
-            }
-          } else {
-            // 显示总帮助
-            await msg.edit({ text: help_text, parseMode: "html" });
-          }
-          return;
-        }
-
-        // 处理 help 在后的情况：.example [subcommand] help
-        if (args[1] && (args[1].toLowerCase() === "help" || args[1].toLowerCase() === "h")) {
-          // 显示当前子命令的帮助
-          const subCmd = sub;
-          // 根据 subCmd 显示对应的帮助信息...
-          return;
-        }
-
-        // 处理具体的子命令
-        if (sub === "query") {
-          // 查询逻辑...
-        } else if (sub === "process") {
-          // 处理逻辑...
-        } else {
-          // 未知命令
-          await msg.edit({
-            text: `❌ <b>未知命令:</b> <code>${htmlEscape(sub)}</code>\n\n💡 使用 <code>${mainPrefix}example help</code> 查看帮助`,
-            parseMode: "html"
-          });
-        }
-
-      } catch (error: any) {
-        console.error("[example] 插件执行失败:", error);
-        await msg.edit({
-          text: `❌ <b>插件执行失败:</b> ${htmlEscape(error.message)}`,
-          parseMode: "html"
-        });
-      }
-    }
+    mp: this.handleCommand.bind(this)
   };
-}
-```
-
-### Telegram 显示格式注意事项
-
-#### ⚠️ HTML 格式处理规范
-
-**发送文件时的格式设置：**
-```typescript
-// ✅ 正确：发送文件时明确设置 parseMode
-await client.sendFile(msg.peerId, {
-    file: item.media,
-    caption: item.caption,
-    parseMode: 'html',  // 必需！确保HTML格式正确解析
-    replyTo: msg.replyTo?.replyToMsgId
-});
-
-// ❌ 错误：未设置 parseMode，导致HTML标签显示为纯文本
-await client.sendFile(msg.peerId, {
-    file: item.media,
-    caption: item.caption
-});
-```
-
-**URL 链接的转义处理：**
-```typescript
-// ✅ 正确：对URL进行HTML转义
-caption: `<b>🎨 ${htmlEscape(title)}</b>
-
-🔗 <b>原图:</b> <a href="${htmlEscape(originalUrl)}">高清查看</a>
-📐 <b>尺寸:</b> <code>${width}×${height}</code>`
-
-// ❌ 错误：URL未转义，特殊字符可能导致HTML解析错误
-caption: `<b>🎨 ${htmlEscape(title)}</b>
-
-🔗 <b>原图:</b> <a href="${originalUrl}">高清查看</a>`
-```
-
-**TypeScript 类型兼容性：**
-```typescript
-// ✅ 正确：使用支持的属性
-interface MediaGroup {
-    media: string;
-    type: string;
-    caption?: string;
-    hasSpoiler?: boolean;  // 仅用于内部标记
-}
-
-// SendFile 时去除不兼容的属性
-await client.sendFile(msg.peerId, {
-    file: item.media,
-    caption: item.caption,
-    parseMode: 'html'
-    // 注意：不要添加 spoiler 属性，SendFileInterface 不支持
-});
-
-// ❌ 错误：使用不兼容的属性会导致 TypeScript 编译错误
-await client.sendFile(msg.peerId, {
-    spoiler: item.hasSpoiler  // 编译错误！
-});
-```
-
-### 错误处理标准
-```typescript
-// 标准错误处理模式
-try {
-  // 业务逻辑
-  await msg.edit({ text: "🔄 处理中...", parseMode: "html" });
   
-  // 执行具体操作
-  const result = await someOperation();
-  
-  await msg.edit({ 
-    text: `✅ <b>操作成功</b>\n\n${htmlEscape(result)}`,
-    parseMode: "html" 
-  });
-  
-} catch (error: any) {
-  console.error("[plugin] 操作失败:", error);
-  
-  // 处理特定错误类型
-  if (error.message?.includes("FLOOD_WAIT")) {
-    const waitTime = parseInt(error.message.match(/\d+/)?.[0] || "60");
-    await msg.edit({
-      text: `⏳ <b>请求过于频繁</b>\n\n需要等待 ${waitTime} 秒后重试`,
-      parseMode: "html"
-    });
-    return;
-  }
-  
-  if (error.message?.includes("MESSAGE_TOO_LONG")) {
-    await msg.edit({
-      text: "❌ <b>消息过长</b>\n\n请减少内容长度或使用文件发送",
-      parseMode: "html"
-    });
-    return;
-  }
-  
-  // 通用错误处理
-  await msg.edit({
-    text: `❌ <b>操作失败:</b> ${htmlEscape(error.message || "未知错误")}`,
-    parseMode: "html"
-  });
-}
-```
-
-## 高级技巧
-
-### 复杂类型定义
-```typescript
-// 定义复杂的任务类型系统
-type AcronType = "send" | "copy" | "forward" | "del" | "del_re" | "pin" | "unpin" | "cmd";
-
-type AcronTaskBase = {
-  id: string;
-  type: AcronType;
-  cron: string;
-  chat: string;
-  chatId?: string;
-  createdAt: string;
-  lastRunAt?: string;
-  lastResult?: string;
-  lastError?: string;
-  disabled?: boolean;
-  remark?: string;
-  display?: string;
-};
-
-// 使用交叉类型扩展基础类型
-type DelTask = AcronTaskBase & {
-  type: "del";
-  msgId: string;
-};
-
-type SendTask = AcronTaskBase & {
-  type: "send";
-  message: string;
-  entities?: any;
-  replyTo?: string;
-};
-```
-
-### 动态代码执行
-```typescript
-// Data URL 动态导入
-async function exec(code: string, context: any) {
-  return await (
-    await import(
-      `data:text/javascript;charset=utf-8,${encodeURIComponent(
-        `export default async (context) => { 
-          const { msg, client, Api, _, axios, sleep, dayjs } = context;
-          ${code}
-        }`
-      )}`
-    )
-  ).default(context);
-}
-
-// 执行上下文
-const executionContext = {
-  msg, chat: msg?.chat, sender: msg?.sender,
-  client, Api, _, axios, dayjs, sleep,
-  formatEntity, run: runCommand
-};
-```
-
-### 消息实体转换
-```typescript
-function convertEntities(entities: Api.TypeMessageEntity[]): any[] {
-  if (!entities) return [];
-  return entities.map((entity) => {
-    const base = { offset: entity.offset, length: entity.length };
-    if (entity instanceof Api.MessageEntityBold) return { ...base, type: "bold" };
-    if (entity instanceof Api.MessageEntityItalic) return { ...base, type: "italic" };
-    if (entity instanceof Api.MessageEntityUnderline) return { ...base, type: "underline" };
-    if (entity instanceof Api.MessageEntityStrike) return { ...base, type: "strikethrough" };
-    if (entity instanceof Api.MessageEntitySpoiler) return { ...base, type: "spoiler" };
-    if (entity instanceof Api.MessageEntityCode) return { ...base, type: "code" };
-    if (entity instanceof Api.MessageEntityPre) return { ...base, type: "pre", language: (entity as any).language };
-    if (entity instanceof Api.MessageEntityUrl) return { ...base, type: "url" };
-    if (entity instanceof Api.MessageEntityTextUrl) return { ...base, type: "text_link", url: (entity as any).url };
-    if (entity instanceof Api.MessageEntityMention) return { ...base, type: "mention" };
-    if (entity instanceof Api.MessageEntityMentionName) return { ...base, type: "text_mention", user: { id: (entity as any).userId }};
-    if (entity instanceof Api.MessageEntityCustomEmoji) {
-      const documentId = (entity as any).documentId;
-      const custom_emoji_id = documentId?.value?.toString() || documentId?.toString() || "";
-      return { ...base, type: "custom_emoji", custom_emoji_id };
-    }
-    if (entity instanceof Api.MessageEntityHashtag) return { ...base, type: "hashtag" };
-    if (entity instanceof Api.MessageEntityCashtag) return { ...base, type: "cashtag" };
-    if (entity instanceof Api.MessageEntityBotCommand) return { ...base, type: "bot_command" };
-    if (entity instanceof Api.MessageEntityEmail) return { ...base, type: "email" };
-    if (entity instanceof Api.MessageEntityPhone) return { ...base, type: "phone_number" };
-    return base;
-  });
-}
-```
-
-### Flood Wait 处理
-```typescript
-async function handleFloodWait<T>(operation: () => Promise<T>): Promise<T> {
-  try {
-    return await operation();
-  } catch (error: any) {
-    if (error.message?.includes("FLOOD_WAIT")) {
-      const waitTime = parseInt(error.message.match(/\d+/)?.[0] || "60");
-      await sleep((waitTime + 1) * 1000);
-      return await operation();
-    }
-    throw error;
-  }
-}
-```
-
-### 封禁管理工具
-```typescript
-// 解封用户 - 移除所有限制
-async function unbanUser(client: TelegramClient, channel: any, user: any): Promise<boolean>;
-
-// 封禁用户
-async function banUser(client: TelegramClient, channel: any, user: any, untilDate?: number): Promise<boolean>;
-
-// 踢出用户（封禁后立即解封）
-async function kickUser(client: TelegramClient, channel: any, user: any): Promise<boolean>;
-
-// 获取被封禁的用户列表
-async function getBannedUsers(client: TelegramClient, channel: any, limit?: number): Promise<Array<{
-  id: number;
-  firstName: string;
-  username?: string;
-  kickedBy?: number;
-  kickedDate?: number;
-}>>;
-
-// 批量解封用户
-async function batchUnbanUsers(
-  client: TelegramClient, 
-  channel: any, 
-  userIds: number[], 
-  delayMs?: number
-): Promise<{ success: number[]; failed: number[]; }>;
-```
-
-## 通用API处理技巧
-
-### ⚠️ 消息生命周期管理
-
-**自动删除消息的优雅处理：**
-```typescript
-// 通用的编辑并删除函数
-private async editAndDelete(msg: Api.Message, text: string, seconds: number = 5) {
-  await msg.edit({ text, parseMode: "html" });
-  
-  if (!this.shouldKeepLog()) {
-    // 创建定时器
-    const timer = setTimeout(() => {
-      msg.delete().catch(() => {}); // 添加 catch 确保安全
-    }, seconds * 1000);
-    
-    // 取消引用，允许 Node.js 进程优雅退出
-    timer.unref();
-  }
-}
-
-// 配置是否保留日志
-private shouldKeepLog(): boolean {
-  return this.config?.keepLog ?? true;
-}
-```
-
-### Premium 状态缓存机制
-
-```typescript
-class BasePlugin extends Plugin {
-  private isPremium: boolean | null = null;
-
-  // 通用 Premium 状态检测（带缓存）
-  protected async checkPremiumStatus(): Promise<boolean> {
-    if (this.isPremium === null) {
-      const client = await getGlobalClient();
-      if (client) {
-        const me = await client.getMe();
-        this.isPremium = (me as Api.User)?.premium || false;
-      } else {
-        this.isPremium = false;
-      }
-    }
-    return this.isPremium;
-  }
-
-  // 重置缓存（用于状态变更时）
-  protected resetPremiumCache(): void {
-    this.isPremium = null;
-  }
-}
-```
-
-### 通用数据库初始化模式
-
-```typescript
-// 通用数据库初始化模式
-class DatabasePlugin extends Plugin {
-  protected db: any;
-  
-  constructor(pluginName: string, defaultState: any) {
-    super();
-    this.initializeDB(pluginName, defaultState);
-  }
-
-  protected async initializeDB(pluginName: string, defaultState: any) {
-    const dbPath = path.join(createDirectoryInAssets(pluginName), "db.json");
-    this.db = await JSONFilePreset(dbPath, defaultState);
-  }
-
-  // 通用配置设置方法
-  protected async setConfig(msg: Api.Message, key: string, value: string, validValues?: string[]) {
-    if (validValues && !validValues.includes(value.toLowerCase())) {
-      await this.editAndDelete(msg, `❌ 无效值。可用值: ${validValues.join(', ')}`);
-      return false;
-    }
-
-    const processedValue = value.toLowerCase() === "true" ? true : 
-                          value.toLowerCase() === "false" ? false : value;
-    
-    this.db.data.config[key] = processedValue;
-    await this.db.write();
-    await this.editAndDelete(msg, `✅ <b>设置已更新:</b> <code>${key}</code> = <code>${processedValue}</code>`, 10);
-    return true;
-  }
-}
-```
-
-## 会员点击反应实现方案
-
-### 标准表情白名单管理
-
-```typescript
-// 可用标准表情常量（所有插件通用）
-const AVAILABLE_REACTIONS = "👍👎❤️🔥🥰👏😁🤔🤯😱🤬😢🎉🤩🤮💩🙏👌🕊🤡🥱🥴😍🐳❤️‍🔥🌚🌭💯🤣⚡️🍌🏆💔🤨😐🍓🍾💋🖕😈😎😇😤🏻‍💻";
-
-// 表情验证工具
-class ReactionValidator {
-  static isValidStandardReaction(emoji: string): boolean {
-    return AVAILABLE_REACTIONS.includes(emoji);
-  }
-
-  static filterValidReactions(emojis: string[]): string[] {
-    return emojis.filter(emoji => this.isValidStandardReaction(emoji));
-  }
-}
-```
-
-### 通用表情解析引擎
-
-```typescript
-// 通用表情解析类
-class ReactionParser {
-  private isPremium: boolean;
-
-  constructor(isPremium: boolean) {
-    this.isPremium = isPremium;
-  }
-
-  // 解析消息中的表情（支持标准表情和自定义表情）
-  async parseReactions(msg: Api.Message, text: string): Promise<(string | BigInteger)[]> {
-    const validReactions: (string | BigInteger)[] = [];
-    const customEmojiMap = new Map<number, BigInteger>();
-    const customEmojiIndices = new Set<number>();
-
-    // 处理自定义表情（仅 Premium 用户）
-    if (this.isPremium) {
-      const customEmojiEntities = (msg.entities || []).filter(
-        (e): e is Api.MessageEntityCustomEmoji => e instanceof Api.MessageEntityCustomEmoji
-      );
-      
-      for (const entity of customEmojiEntities) {
-        customEmojiMap.set(entity.offset, entity.documentId);
-        for (let i = 0; i < entity.length; i++) {
-          customEmojiIndices.add(entity.offset + i);
-        }
-      }
-    }
-
-    // 查找文本在消息中的位置
-    const textOffsetInMessage = msg.message.indexOf(text);
-    if (textOffsetInMessage === -1) return [];
-
-    // 逐字符解析表情
-    let currentIndex = 0;
-    for (const char of text) {
-      const fullMessageOffset = textOffsetInMessage + currentIndex;
-      
-      // 检查是否为自定义表情
-      if (customEmojiMap.has(fullMessageOffset)) {
-        validReactions.push(customEmojiMap.get(fullMessageOffset)!);
-      } 
-      // 检查是否为标准表情
-      else if (!customEmojiIndices.has(fullMessageOffset) && AVAILABLE_REACTIONS.includes(char)) {
-        validReactions.push(char);
-      }
-      
-      currentIndex += char.length;
-    }
-
-    // 去重并返回
-    return [...new Set(validReactions)];
-  }
-}
-```
-
-### 通用反应发送器
-
-```typescript
-// 通用反应发送类
-class ReactionSender {
-  // 发送反应到指定消息
-  static async sendReaction(
-    peer: Api.TypePeer, 
-    msgId: number, 
-    reactions: (string | BigInteger)[], 
-    big: boolean = true
-  ): Promise<boolean> {
+  // 主命令处理
+  private async handleCommand(msg: Api.Message): Promise<void> {
     const client = await getGlobalClient();
-    if (!client || reactions.length === 0) return false;
-
+    if (!client) return;
+    
+    // 使用标准参数解析
+    const { subCommand, args } = parseCommand(msg);
+    
     try {
-      // 构建反应对象
-      const reactionObjects = reactions.map(r => {
-        if (typeof r === 'string') {
-          // 标准表情
-          if (AVAILABLE_REACTIONS.includes(r)) {
-            return new Api.ReactionEmoji({ emoticon: r });
-          }
-          // 字符串形式的自定义表情ID
-          return new Api.ReactionCustomEmoji({ documentId: bigInt(r) });
-        } else {
-          // BigInteger 形式的自定义表情ID
-          return new Api.ReactionCustomEmoji({ documentId: bigInt(r) });
-        }
+      // 子命令路由
+      switch (subCommand) {
+        case "start":
+          await this.handleStart(msg);
+          break;
+        case "stop":
+          await this.handleStop(msg);
+          break;
+        case "status":
+          await this.handleStatus(msg);
+          break;
+        case "help":
+        case "h":
+          await msg.edit({ text: this.HELP, parseMode: "html" });
+          break;
+        default:
+          await this.handleDefault(msg, subCommand);
+      }
+    } catch (error: any) {
+      await sendError(msg, error, this.PLUGIN_NAME);
+    }
+  }
+  
+  // 默认处理
+  private async handleDefault(msg: Api.Message, sub: string | undefined) {
+    if (!sub) {
+      // 无参数时的默认行为
+      await msg.edit({ text: this.HELP, parseMode: "html" });
+    } else {
+      // 未知命令
+      const prefix = getPrefixInfo().display;
+      await msg.edit({
+        text: `❌ 未知命令: <code>${htmlEscape(sub)}</code>\n\n💡 使用 <code>${prefix}mp help</code> 查看帮助`,
+        parseMode: "html"
       });
-
-      // 发送反应
-      await client.invoke(
-        new Api.messages.SendReaction({
-          peer,
-          msgId,
-          reaction: reactionObjects,
-          big
-        })
-      );
-      
-      return true;
-    } catch (error) {
-      console.error("[ReactionSender] 发送反应失败:", error);
-      return false;
     }
   }
-
-  // 批量发送反应（带延迟防止频率限制）
-  static async sendReactionsBatch(
-    targets: Array<{ peer: Api.TypePeer; msgId: number; reactions: (string | BigInteger)[] }>,
-    big: boolean = true,
-    delayMs: number = 1000
-  ): Promise<{ success: number; failed: number }> {
-    let success = 0;
-    let failed = 0;
-
-    for (const target of targets) {
-      const result = await this.sendReaction(target.peer, target.msgId, target.reactions, big);
-      if (result) {
-        success++;
-      } else {
-        failed++;
-      }
-      
-      // 添加延迟防止频率限制
-      if (delayMs > 0) {
-        await sleep(delayMs);
-      }
-    }
-
-    return { success, failed };
+  
+  // 具体功能实现（用户自定义）
+  private async handleStart(msg: Api.Message) {
+    await msg.edit({ text: "✅ 已启动", parseMode: "html" });
+  }
+  
+  private async handleStop(msg: Api.Message) {
+    await msg.edit({ text: "⏹️ 已停止", parseMode: "html" });
+  }
+  
+  private async handleStatus(msg: Api.Message) {
+    await msg.edit({ text: "📊 运行中", parseMode: "html" });
   }
 }
+
+export default new StandardPlugin();
 ```
 
-### 会员点击反应监听器
+### 📦 配置管理框架
 
 ```typescript
-// 通用反应监听基类
-abstract class ReactionListener extends Plugin {
-  protected reactionParser: ReactionParser | null = null;
+// ========== 统一配置管理 ==========
+
+import { JSONFilePreset } from "lowdb/node";
+import { createDirectoryInAssets } from "@utils/pathHelpers";
+import * as path from "path";
+
+class PluginConfig<T = any> {
+  private db: any = null;
+  private pluginName: string;
+  private defaultConfig: T;
   
-  // 消息监听器
-  public listenMessageHandler = this.handleMessage.bind(this);
-
-  protected async initReactionParser() {
-    if (!this.reactionParser) {
-      const isPremium = await this.checkPremiumStatus();
-      this.reactionParser = new ReactionParser(isPremium);
-    }
+  constructor(pluginName: string, defaultConfig: T) {
+    this.pluginName = pluginName;
+    this.defaultConfig = defaultConfig;
   }
-
-  // 抽象方法：子类实现具体的反应逻辑
-  protected abstract shouldReact(msg: Api.Message): Promise<{
-    shouldReact: boolean;
-    reactions: (string | BigInteger)[];
-    big?: boolean;
-  }>;
-
-  private async handleMessage(msg: Api.Message) {
-    try {
-      const reactionConfig = await this.shouldReact(msg);
-      
-      if (reactionConfig.shouldReact && reactionConfig.reactions.length > 0) {
-        await ReactionSender.sendReaction(
-          msg.peerId, 
-          msg.id, 
-          reactionConfig.reactions, 
-          reactionConfig.big ?? true
-        );
-      }
-    } catch (error) {
-      console.error("[ReactionListener] 处理消息失败:", error);
-    }
-  }
-}
-
-// 使用示例：基于特定条件的反应插件
-class ConditionalReactionPlugin extends ReactionListener {
-  protected async shouldReact(msg: Api.Message) {
-    // 根据自定义逻辑判断是否需要反应
-    const shouldReactCondition = await this.checkCondition(msg);
+  
+  async init(): Promise<void> {
+    if (this.db) return;
     
-    if (shouldReactCondition) {
-      return {
-        shouldReact: true,
-        reactions: await this.getReactions(msg),
-        big: this.getConfig('big') ?? true
-      };
-    }
-    
-    return { shouldReact: false, reactions: [] };
-  }
-  
-  private async checkCondition(msg: Api.Message): Promise<boolean> {
-    // 实现自定义条件检查逻辑
-    return false;
-  }
-  
-  private async getReactions(msg: Api.Message): Promise<(string | BigInteger)[]> {
-    // 实现获取反应的逻辑
-    return [];
-  }
-}
-```
-
-### 使用示例
-
-```typescript
-// 基本反应发送
-await ReactionSender.sendReaction(msg.peerId, msg.id, ["👍", "❤️"], true);
-
-// 解析用户输入的表情
-await this.initReactionParser();
-const reactions = await this.reactionParser!.parseReactions(msg, "👍👎🥰");
-
-// 批量发送反应
-const targets = [
-  { peer: msg.peerId, msgId: msg.id, reactions: ["👍"] },
-  { peer: msg.peerId, msgId: msg.id + 1, reactions: ["❤️"] }
-];
-const result = await ReactionSender.sendReactionsBatch(targets, true, 500);
-```
-
-### 实体格式化
-```typescript
-async function formatEntity(target: any, mention?: boolean, throwErrorIfFailed?: boolean) {
-  const client = await getGlobalClient();
-  if (!client) throw new Error("客户端未初始化");
-  
-  let id: any, entity: any;
-  try {
-    entity = target?.className ? target : await client?.getEntity(target);
-    if (!entity) throw new Error("无法获取entity");
-    id = entity.id;
-  } catch (e: any) {
-    if (throwErrorIfFailed) throw new Error(`无法获取 ${target}: ${e?.message}`);
-  }
-  
-  const displayParts: string[] = [];
-  if (entity?.title) displayParts.push(htmlEscape(entity.title));
-  if (entity?.firstName) displayParts.push(htmlEscape(entity.firstName));
-  if (entity?.lastName) displayParts.push(htmlEscape(entity.lastName));
-  if (entity?.username) {
-    displayParts.push(mention ? `@${entity.username}` : `<code>@${entity.username}</code>`);
-  }
-  if (id) {
-    displayParts.push(
-      entity instanceof Api.User
-        ? `<a href="tg://user?id=${id}">${id}</a>`
-        : `<a href="https://t.me/c/${id}">${id}</a>`
+    const dbPath = path.join(
+      createDirectoryInAssets(this.pluginName),
+      `${this.pluginName}_config.json`
     );
+    
+    this.db = await JSONFilePreset<T>(dbPath, this.defaultConfig);
   }
   
-  return { id, entity, display: displayParts.join(" ").trim() };
-}
-
-// 扩展 Api.Message 类型（xream 实现）
-declare module "telegram/tl/api" {
-  interface Message {
-    deleteWithDelay(delayMs?: number): Promise<void>;
-    safeDelete(params?: { revoke?: boolean }): Promise<void>;
+  async get<K extends keyof T>(key?: K): Promise<K extends keyof T ? T[K] : T> {
+    await this.init();
+    return key ? this.db.data[key] : this.db.data;
+  }
+  
+  async set<K extends keyof T>(key: K, value: T[K]): Promise<void> {
+    await this.init();
+    this.db.data[key] = value;
+    await this.db.write();
+  }
+  
+  async update(updates: Partial<T>): Promise<void> {
+    await this.init();
+    Object.assign(this.db.data, updates);
+    await this.db.write();
+  }
+  
+  async reset(): Promise<void> {
+    await this.init();
+    this.db.data = { ...this.defaultConfig };
+    await this.db.write();
   }
 }
 
 // 使用示例
-await msg.edit({ text: "操作完成！" });
-await msg.deleteWithDelay(5000); // 5秒后删除
+interface MyPluginConfig {
+  enabled: boolean;
+  apiKey: string;
+  maxRetries: number;
+  timeout: number;
+}
 
-// 安全删除（不会因权限问题导致进程退出）
-await msg.safeDelete({ revoke: true });
+const config = new PluginConfig<MyPluginConfig>("myplugin", {
+  enabled: true,
+  apiKey: "",
+  maxRetries: 3,
+  timeout: 30000
+});
 
-function tryParseRegex(input: string): RegExp {
-  const trimmed = input.trim();
-  if (trimmed.startsWith("/") && trimmed.lastIndexOf("/") > 0) {
-    const lastSlash = trimmed.lastIndexOf("/");
-    const pattern = trimmed.slice(1, lastSlash);
-    const flags = trimmed.slice(lastSlash + 1);
-    return new RegExp(pattern, flags);
+// 获取配置
+const isEnabled = await config.get("enabled");
+const allConfig = await config.get();
+
+// 设置配置
+await config.set("apiKey", "your-api-key");
+await config.update({ enabled: false, maxRetries: 5 });
+
+```
+
+### 🔄 消息处理模式
+
+```typescript
+// ========== 渐进式状态反馈 ==========
+
+class ProgressManager {
+  private msg: Api.Message;
+  private startTime: number;
+  
+  constructor(msg: Api.Message) {
+    this.msg = msg;
+    this.startTime = Date.now();
   }
-  return new RegExp(trimmed);
-}
-```
-
-### 多行命令解析
-```typescript
-// 解析多行命令格式
-const lines = msg.message.split(/\r?\n/g).map(l => l.trim());
-const args = lines[0].split(/\s+/g);
-const param1 = lines[1]; // 第二行作为参数
-const param2 = lines[2]; // 第三行作为参数
-```
-
-## 工具函数库
-
-### 命令执行
-```typescript
-import { getCommandFromMessage, dealCommandPluginWithMessage } from "@utils/pluginManager";
-
-async function runCommand(commandText: string, msg: Api.Message, trigger?: Api.Message) {
-  const cmd = await getCommandFromMessage(commandText);
-  const cmdMsg = await msg.client?.sendMessage(msg.peerId, {
-    message: commandText,
-    replyTo: msg.replyToMsgId,
-  });
-  if (cmd && cmdMsg) {
-    await dealCommandPluginWithMessage({ cmd, msg: cmdMsg, trigger: msg });
+  
+  async update(text: string, emoji: string = "🔄"): Promise<void> {
+    const elapsed = formatDuration(Date.now() - this.startTime);
+    await this.msg.edit({
+      text: `${emoji} ${text}\n⏱️ 已用时: ${elapsed}`,
+      parseMode: "html"
+    });
+  }
+  
+  async success(text: string): Promise<void> {
+    const elapsed = formatDuration(Date.now() - this.startTime);
+    await this.msg.edit({
+      text: `✅ ${text}\n⏱️ 总用时: ${elapsed}`,
+      parseMode: "html"
+    });
+  }
+  
+  async error(error: any): Promise<void> {
+    await sendError(this.msg, error);
   }
 }
+
+// 使用示例
+const progress = new ProgressManager(msg);
+await progress.update("正在初始化...");
+await progress.update("正在处理数据...", "📊");
+await progress.success("处理完成！");
+
 ```
 
+### 🛡️ 错误处理框架
 
-### 用户验证
 ```typescript
-function isValidUser(entity: any): boolean {
-  if (!entity) return false;
-  return !entity.bot && !entity.deleted && !entity.fake && !entity.scam;
+// ========== 统一错误处理 ==========
+
+enum ErrorType {
+  PERMISSION = "权限不足",
+  INVALID_INPUT = "输入无效",
+  API_ERROR = "API错误",
+  NETWORK = "网络错误",
+  TIMEOUT = "超时",
+  NOT_FOUND = "未找到",
+  RATE_LIMIT = "请求过于频繁"
 }
 
-function extractSenderId(message: Api.Message): number | undefined {
-  const from = (message as any).fromId as any;
-  const userId = from?.userId ? Number(from.userId) : undefined;
-  return Number.isFinite(userId) ? userId : Number(message.senderId);
-}
-```
-
-### 概率计算
-```typescript
-function calculateProbability(selected: number, total: number): string {
-  if (total === 0) return "0.00";
-  const probability = (selected / total) * 100;
-  return (Math.round(probability * 100) / 100).toString();
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("zh-CN");
-}
-```
-
-### Fisher-Yates 洗牌
-```typescript
-function shuffleArray<T>(array: T[]): T[] {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
+class PluginError extends Error {
+  type: ErrorType;
+  details?: any;
+  
+  constructor(type: ErrorType, message: string, details?: any) {
+    super(message);
+    this.type = type;
+    this.details = details;
   }
-  return array;
 }
+
+// 错误处理器
+class ErrorHandler {
+  static async handle(msg: Api.Message, error: any): Promise<void> {
+    console.error(`[Plugin Error]:`, error);
+    
+    let errorMsg: string;
+    
+    if (error instanceof PluginError) {
+      errorMsg = `❌ <b>${error.type}:</b> ${htmlEscape(error.message)}`;
+    } else if (error.message?.includes("FLOOD_WAIT")) {
+      const waitTime = parseInt(error.message.match(/\d+/)?.[0] || "60");
+      errorMsg = `⏳ <b>请求过于频繁</b>\n\n需要等待 ${waitTime} 秒后重试`;
+    } else if (error.message?.includes("MESSAGE_TOO_LONG")) {
+      errorMsg = `❌ <b>消息过长</b>\n\n请减少内容长度或分段发送`;
+    } else {
+      errorMsg = `❌ <b>操作失败:</b> ${htmlEscape(error.message || "未知错误")}`;
+    }
+    
+    await msg.edit({ text: errorMsg, parseMode: "html" });
+  }
+}
+
+// 使用示例
+try {
+  if (!userId) {
+    throw new PluginError(ErrorType.INVALID_INPUT, "用户ID不能为空");
+  }
+  // ... 其他逻辑
+} catch (error) {
+  await ErrorHandler.handle(msg, error);
+}
+
+```
+
+### 📝 Telegram 消息格式规范
+
+```typescript
+// ========== HTML 格式处理 ==========
+
+class MessageFormatter {
+  // 发送文件时的标准格式
+  static async sendFile(client: TelegramClient, peer: any, file: any, caption?: string) {
+    return await client.sendFile(peer, {
+      file,
+      caption,
+      parseMode: 'html'  // 必需！确保HTML格式正确解析
+    });
+  }
+  
+  // 构建安全的HTML消息
+  static buildHtml(parts: { text: string, escape?: boolean }[]): string {
+    return parts.map(part => 
+      part.escape !== false ? htmlEscape(part.text) : part.text
+    ).join('');
+  }
+  
+  // 格式化链接
+  static link(url: string, text: string): string {
+    return `<a href="${htmlEscape(url)}">${htmlEscape(text)}</a>`;
+  }
+  
+  // 格式化代码
+  static code(text: string): string {
+    return `<code>${htmlEscape(text)}</code>`;
+  }
+  
+  // 格式化粗体
+  static bold(text: string): string {
+    return `<b>${htmlEscape(text)}</b>`;
+  }
+}
+
+// 使用示例
+const caption = MessageFormatter.buildHtml([
+  { text: '🎨 ', escape: false },
+  { text: title },
+  { text: '\n\n🔗 原图: ', escape: false },
+  { text: MessageFormatter.link(url, '查看'), escape: false }
+]);
 ```
 
 
-### 帮助系统设计原则
+## 开发指南
 
-#### 帮助文本定义要求
+### 快速开始
 
-**所有插件必须定义 `help_text` 常量，并在 `description` 中引用：**
-
-```typescript
-// ✅ 正确：定义 help_text 常量
-const help_text = `📝 <b>插件名称</b>
-
-<b>命令格式：</b>
-<code>.cmd [子命令] [参数]</code>
-
-<b>可用命令：</b>
-• <code>.cmd sub1</code> - 子命令1说明
-• <code>.cmd sub2</code> - 子命令2说明
-• <code>.cmd help</code> - 显示帮助
-
-<b>示例：</b>
-<code>.cmd sub1### ✅ 必须遵循（强制要求）
-- [ ] **实现 description 和 cmdHandlers**（abstract 属性，必需）
-- [ ] **定义 `const help_text` 常量并在 description 中引用**
-  - 格式：`const help_text = "帮助内容";`
-  - 引用：`description: string = \`插件简介\\n\\n${help_text}\`;`
-- [ ] **所有用户输入必须HTML转义**（安全红线，不可妥协）
-- [ ] **优先使用 lowdb 存储配置和Cookie**（自动保存，无需手动管理）
-- [ ] **注意 Telegram 消息长度限制 4096 字符**（超长需分割发送）
-- [ ] **明确区分指令架构模式**（详见指令架构设计章节）
-
-### 🔧 推荐配置（最佳实践）
-- [ ] **设置 `ignoreEdited: true`**（默认值，避免重复处理编辑消息）
-  - 防止用户编辑命令时重复触发插件
-  - 可通过环境变量 `TB_CMD_IGNORE_EDITED` 覆盖
-  - 特殊需求时可设为 `false`
-
-### ⚠️ 插件命名规范
-
-**插件名称要求：**
-- **禁止使用单字母插件名**（如 `a.ts`、`x.ts`）
-- **插件名最少两位字母**（如 `ab.ts`、`my.ts`）
-- **推荐使用有意义的名称**（如 `music.ts`、`trace.ts`）
+#### 1. 创建插件
 
 ```typescript
-// ❌ 错误：单字母插件名
-// 文件名：a.ts, b.ts, x.ts
+// plugins/myplugin.ts
+import { Plugin } from "@utils/pluginBase";
+import { getPrefixes } from "@utils/pluginManager";
+import { Api } from "telegram";
 
-// ✅ 正确：多字母插件名
-// 文件名：ab.ts, my.ts, music.ts, trace.ts
+const prefixes = getPrefixes();
+const mainPrefix = prefixes[0];
+
+const htmlEscape = (text: string): string => 
+  text.replace(/[&<>"']/g, m => ({ 
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', 
+    '"': '&quot;', "'": '&#x27;' 
+  }[m] || m));
 
 class MyPlugin extends Plugin {
-  // 插件实现
+  description = `我的插件说明\n\n使用 ${mainPrefix}mycommand 触发`;
+  
+  cmdHandlers = {
+    mycommand: async (msg: Api.Message) => {
+      const text = `<b>Hello from MyPlugin!</b>`;
+      await msg.edit({ text, parseMode: "html" });
+    }
+  };
 }
 
 export default new MyPlugin();
 ```
 
-**原因说明：**
-- 单字母命令容易产生冲突
-- 降低用户体验和可读性
-- 不利于插件管理和维护
-
-## 环境变量配置
-
-### 支持的环境变量
-
-TeleBox 支持通过 `.env` 文件或系统环境变量进行配置：
+#### 2. 重载插件
 
 ```bash
-# .env 文件示例
-# 命令前缀（空格分隔）
-TB_PREFIX=. 。
-
-# Sudo 命令前缀（空格分隔）
-TB_SUDO_PREFIX=# $
-
-# 全局设置命令是否忽略编辑的消息
-TB_CMD_IGNORE_EDITED=false
-
-# 设置哪些插件的监听不忽略编辑的消息（空格分隔）
-TB_LISTENER_HANDLE_EDITED=sudo sure
-
-# 连接重试次数
-TB_CONNECTION_RETRIES=5
+.reload          # 重载所有插件
+.reload myplugin # 重载指定插件
 ```
 
-### Telegram 代理配置
+### 核心API
 
-在 `config.json` 中配置代理：
-
-```json
-{
-  "apiId": "your_api_id",
-  "apiHash": "your_api_hash",
-  "proxy": {
-    "ip": "127.0.0.1",
-    "port": 40000,
-    "socksType": 5  // SOCKS5 代理
-  }
-}
-```
-
-### 编辑消息处理机制
+#### Telegram操作
 
 ```typescript
-// 插件级别的编辑消息控制
-class MyPlugin extends Plugin {
-  // 命令处理器是否忽略编辑消息（默认继承全局设置）
-  ignoreEdited?: boolean = cmdIgnoreEdited;
-  
-  // 监听器是否忽略编辑消息（默认为 true）
-  listenMessageHandlerIgnoreEdited?: boolean = true;
-  
-  // 监听器现在支持 isEdited 参数
-  listenMessageHandler = async (
-    msg: Api.Message,
-    options?: { isEdited?: boolean }
-  ) => {
-    if (options?.isEdited) {
-      // 处理编辑的消息
-      console.log("处理编辑消息");
-    }
-    // 正常处理逻辑
-  };
-}
+import { getGlobalClient } from "@utils/globalClient";
+import { Api } from "telegram";
+
+const client = await getGlobalClient();
+
+// 发送消息
+await client.sendMessage(chatId, { 
+  message: "Hello",
+  parseMode: "html" 
+});
+
+// 编辑消息
+await msg.edit({ 
+  text: "<b>Updated</b>", 
+  parseMode: "html" 
+});
+
+// 删除消息
+await msg.delete({ revoke: true });
+
+// 获取实体
+const entity = await client.getEntity(peer);
 ```
 
-## 指令架构设计
+#### 数据库操作 (lowdb)
+
+```typescript
+import { JSONFilePreset } from "lowdb/node";
+import { createDirectoryInAssets } from "@utils/pathHelpers";
+import * as path from "path";
+
+const dbPath = path.join(createDirectoryInAssets("myplugin"), "data.json");
+const db = await JSONFilePreset(dbPath, { users: [] });
+
+// 插入数据
+db.data.users.push({ id: "123", name: "Alice" });
+await db.write();
+
+// 查询数据
+const user = db.data.users.find(u => u.id === "123");
+
+// 更新数据
+const userIndex = db.data.users.findIndex(u => u.id === "123");
+if (userIndex !== -1) {
+  db.data.users[userIndex].name = "Bob";
+  await db.write();
+}
+
+// 删除数据
+db.data.users = db.data.users.filter(u => u.id !== "123");
+await db.write();
+```
+
+#### 文件操作
+
+```typescript
+import { createDirectoryInAssets, createDirectoryInTemp } from "@utils/pathHelpers";
+import * as fs from "fs";
+import * as path from "path";
+
+// 创建插件目录
+const assetsDir = createDirectoryInAssets("myplugin");
+const tempDir = createDirectoryInTemp("myplugin");
+
+// 读写JSON配置
+const configPath = path.join(assetsDir, "config.json");
+fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+```
+
+## 📋 开发规范
+
+### 命名规范
+
+1. **文件命名**
+   - 插件文件：`snake_case.ts` (如 `image_monitor.ts`)
+   - 工具模块：`camelCase.ts` (如 `pluginBase.ts`)
+   - 类型定义：`PascalCase.d.ts` (如 `TelegramTypes.d.ts`)
+   - ⚠️ **禁止插件文件使用单字母** (如 `a.ts`, `x.ts` 等)
+
+2. **变量命名**
+   ```typescript
+   // 常量：全大写下划线分隔
+   const MAX_RETRY_TIMES = 3;
+   const API_BASE_URL = "https://api.telegram.org";
+   
+   // 变量：小驼峰
+   let messageCount = 0;
+   const userName = "Alice";
+   
+   // 函数：小驼峰，动词开头
+   function sendMessage() {}
+   async function fetchUserData() {}
+   
+   // 类：大驼峰
+   class MessageHandler {}
+   interface PluginConfig {}
+   ```
+
+3. **命令命名**
+   - 使用小写字母
+   - 简短易记
+   - 避免特殊字符
+   - 示例：`help`, `start`, `config`
+   - ⚠️ **插件指令的主指令必须是插件文件名**
+   - 其余别名可以在帮助文档中声明，但主指令必须与文件名一致
+
+### 代码风格
+
+1. **TypeScript规范**
+   ```typescript
+   // 使用严格模式
+   "use strict";
+   
+   // 显式类型声明
+   const count: number = 0;
+   const name: string = "TeleBox";
+   
+   // 使用接口定义对象结构
+   interface Config {
+     enabled: boolean;
+     timeout: number;
+   }
+   
+   // 使用枚举定义常量集合
+   enum LogLevel {
+     DEBUG = "debug",
+     INFO = "info",
+     ERROR = "error"
+   }
+   ```
+
+2. **异步处理**
+   ```typescript
+   // 优先使用 async/await
+   async function processMessage(msg: Api.Message): Promise<void> {
+     try {
+       const result = await someAsyncOperation();
+       await msg.edit({ text: result });
+     } catch (error) {
+       await handleError(error, msg);
+     }
+   }
+   
+   // 避免回调地狱
+   // ❌ 错误示例
+   getData((data) => {
+     processData(data, (result) => {
+       saveResult(result, () => {});
+     });
+   });
+   
+   // ✅ 正确示例
+   const data = await getData();
+   const result = await processData(data);
+   await saveResult(result);
+   ```
+
+### 错误处理
+
+1. **错误捕获**
+   ```typescript
+   // 全局错误处理
+   process.on('uncaughtException', (error) => {
+     console.error('Uncaught Exception:', error);
+     // 记录日志并优雅退出
+   });
+   
+   process.on('unhandledRejection', (reason, promise) => {
+     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+   });
+   ```
+
+2. **错误分类**
+   ```typescript
+   class PluginError extends Error {
+     constructor(
+       public type: string,
+       message: string,
+       public details?: any
+     ) {
+       super(message);
+       this.name = 'PluginError';
+     }
+   }
+   
+   // 使用自定义错误
+   throw new PluginError('INVALID_INPUT', '参数无效', { param: value });
+   ```
+
+### 日志规范
+
+1. **日志级别**
+   ```typescript
+   // DEBUG: 详细调试信息
+   console.debug('[Plugin] Processing message:', msgId);
+   
+   // INFO: 一般信息
+   console.info('[Plugin] Plugin loaded successfully');
+   
+   // WARN: 警告信息
+   console.warn('[Plugin] API rate limit approaching');
+   
+   // ERROR: 错误信息
+   console.error('[Plugin] Failed to process:', error);
+   ```
+
+2. **日志格式**
+   ```typescript
+   // 统一格式：[时间] [级别] [模块] 消息
+   const log = (level: string, module: string, message: string) => {
+     const timestamp = new Date().toISOString();
+     console.log(`[${timestamp}] [${level}] [${module}] ${message}`);
+   };
+   ```
+
+### 注释规范
+
+1. **文件头注释**
+   ```typescript
+   /**
+    * @file 插件名称
+    * @description 插件功能描述
+    * @author 作者
+    * @version 1.0.0
+    * @date 2024-01-01
+    */
+   ```
+
+2. **函数注释**
+   ```typescript
+   /**
+    * 发送消息到指定对话
+    * @param peer - 目标对话ID或实体
+    * @param text - 消息文本
+    * @param options - 可选参数
+    * @returns 发送的消息对象
+    * @throws {Error} 当发送失败时抛出错误
+    */
+   async function sendMessage(
+     peer: any,
+     text: string,
+     options?: SendOptions
+   ): Promise<Api.Message> {
+     // 实现代码
+   }
+   ```
+
+3. **行内注释**
+   ```typescript
+   // 检查用户权限
+   if (!await checkPermission(userId)) {
+     return; // 无权限则退出
+   }
+   
+   // TODO: 添加缓存机制提高性能
+   // FIXME: 修复特殊字符处理问题
+   // NOTE: 这里使用了新的API
+   ```
+
+       Heap Total: ${(usage.heapTotal / 1024 / 1024).toFixed(2)} MB
+     `);
+     
+     // 触发垃圾回收（需要 --expose-gc 标志）
+     if (global.gc && usage.heapUsed > 100 * 1024 * 1024) {
+       global.gc();
+     }
+   }
+   ```
+
+### 并发处理
+
+1. **并发控制**
+   ```typescript
+   class ConcurrencyManager {
+     private running = 0;
+     private queue: (() => Promise<any>)[] = [];
+     
+     constructor(private maxConcurrent: number = 5) {}
+     
+     async run<T>(fn: () => Promise<T>): Promise<T> {
+       while (this.running >= this.maxConcurrent) {
+         await new Promise(resolve => setTimeout(resolve, 100));
+       }
+       
+       this.running++;
+       try {
+         return await fn();
+       } finally {
+         this.running--;
+         this.processQueue();
+       }
+     }
+     
+     private processQueue() {
+       if (this.queue.length > 0 && this.running < this.maxConcurrent) {
+         const fn = this.queue.shift();
+         if (fn) this.run(fn);
+       }
+     }
+   }
+   ```
+
+2. **任务队列**
+   ```typescript
+   class TaskQueue {
+     private tasks: Array<() => Promise<any>> = [];
+     private processing = false;
+     
+     add(task: () => Promise<any>) {
+       this.tasks.push(task);
+       this.process();
+     }
+     
+     private async process() {
+       if (this.processing) return;
+       this.processing = true;
+       
+       while (this.tasks.length > 0) {
+         const task = this.tasks.shift();
+         if (task) {
+           try {
+             await task();
+           } catch (error) {
+             console.error('Task failed:', error);
+           }
+         }
+       }
+       
+       this.processing = false;
+     }
+   }
+   ```
+
+### 缓存策略
+
+1. **LRU缓存**
+   ```typescript
+   class LRUCache<K, V> {
+     private cache = new Map<K, V>();
+     
+     constructor(private maxSize: number) {}
+     
+     get(key: K): V | undefined {
+       const value = this.cache.get(key);
+       if (value !== undefined) {
+         // 移到最后（最近使用）
+         this.cache.delete(key);
+         this.cache.set(key, value);
+       }
+       return value;
+     }
+     
+     set(key: K, value: V) {
+       if (this.cache.has(key)) {
+         this.cache.delete(key);
+       } else if (this.cache.size >= this.maxSize) {
+         // 删除最旧的（第一个）
+         const firstKey = this.cache.keys().next().value;
+         this.cache.delete(firstKey);
+       }
+       this.cache.set(key, value);
+     }
+   }
+   ```
+
+2. **分层缓存**
+   ```typescript
+   class TieredCache {
+     private l1Cache = new Map(); // 内存缓存
+     private l2Cache: Database;   // 数据库缓存
+     
+     async get(key: string): Promise<any> {
+       // 先查L1
+       let value = this.l1Cache.get(key);
+       if (value) return value;
+       
+       // 再查L2
+       value = await this.l2Cache.get(key);
+       if (value) {
+         this.l1Cache.set(key, value); // 提升到L1
+       }
+       return value;
+     }
+     
+     async set(key: string, value: any) {
+       this.l1Cache.set(key, value);
+       await this.l2Cache.set(key, value);
+     }
+   }
+   ```
+
+## 🚀 完整插件示例
+
+### 简单命令插件
+
+```typescript
+import { Plugin } from "@utils/pluginBase";
+import { Api } from "telegram";
+
+class SimplePlugin extends Plugin {
+  description = "📌 简单示例插件";
+  
+  cmdHandlers = {
+    ping: async (msg: Api.Message) => {
+      const start = Date.now();
+      await msg.edit({ text: "Pong! 🏓" });
+      const latency = Date.now() - start;
+      await msg.edit({ 
+        text: `Pong! 🏓\n响应时间: ${latency}ms`,
+        parseMode: "html"
+      });
+    },
+    echo: async (msg: Api.Message) => {
+      const text = msg.text?.replace(/^[.!。]echo\s*/i, "") || "无内容";
+      await msg.edit({
+        text: `🗣️ <b>回声:</b>\n<code>${text}</code>`,
+        parseMode: "html"
+      });
+    }
+  };
+}
+
+export default new SimplePlugin();
+```
+
+### 数据库插件
+
+```typescript
+import { Plugin } from "@utils/pluginBase";
+import { Api } from "telegram";
+import { JSONFilePreset } from "lowdb/node";
+import { createDirectoryInAssets } from "@utils/pathHelpers";
+import * as path from "path";
+
+class DataPlugin extends Plugin {
+  description = "💾 数据存储插件示例";
+  private db: any;
+  
+  constructor() {
+    super();
+    this.initDB();
+  }
+  
+  private async initDB() {
+    const dbPath = path.join(createDirectoryInAssets("dataplugin"), "data.json");
+    this.db = await JSONFilePreset(dbPath, { records: [] });
+  }
+  
+  cmdHandlers = {
+    save: async (msg: Api.Message) => {
+      const content = msg.text?.replace(/^[.!。]save\s*/i, "");
+      if (!content) {
+        await msg.edit({ text: "❌ 请提供要保存的内容" });
+        return;
+      }
+      
+      if (!this.db) await this.initDB();
+      
+      this.db.data.records.push({
+        id: Date.now(),
+        user_id: msg.senderId?.toString() || "unknown",
+        content,
+        created_at: Date.now()
+      });
+      await this.db.write();
+      
+      await msg.edit({ text: "✅ 已保存" });
+    },
+    
+    list: async (msg: Api.Message) => {
+      if (!this.db) await this.initDB();
+      
+      const userId = msg.senderId?.toString() || "unknown";
+      const records = this.db.data.records
+        .filter((r: any) => r.user_id === userId)
+        .sort((a: any, b: any) => b.created_at - a.created_at)
+        .slice(0, 10);
+      
+      if (records.length === 0) {
+        await msg.edit({ text: "📄 没有记录" });
+        return;
+      }
+      
+      let text = "📋 <b>最近记录:</b>\n\n";
+      records.forEach((r: any, i: number) => {
+        const date = new Date(r.created_at).toLocaleString('zh-CN');
+        text += `${i + 1}. <code>${r.content}</code>\n   <i>${date}</i>\n\n`;
+      });
+      
+      await msg.edit({ text, parseMode: "html" });
+    }
+  };
+}
+
+export default new DataPlugin();
+```
+
+### 监听器插件
+
+```typescript
+import { Plugin } from "@utils/pluginBase";
+import { Api } from "telegram";
+import { createDirectoryInAssets } from "@utils/pathHelpers";
+import { JSONFilePreset } from "lowdb/node";
+import * as path from "path";
+
+class MonitorPlugin extends Plugin {
+  description = "👁️ 消息监控插件";
+  private stats: any;
+  private configPath: string;
+  
+  constructor() {
+    super();
+    this.configPath = path.join(createDirectoryInAssets("monitor"), "stats.json");
+    this.initStats();
+  }
+  
+  private async initStats() {
+    this.stats = await JSONFilePreset(this.configPath, {
+      totalMessages: 0,
+      users: {},
+      keywords: {}
+    });
+  }
+  
+  // 监听所有消息
+  listenMessageHandler = async (msg: Api.Message) => {
+    const userId = msg.senderId?.toString();
+    if (!userId) return;
+    
+    // 更新统计
+    this.stats.data.totalMessages++;
+    this.stats.data.users[userId] = (this.stats.data.users[userId] || 0) + 1;
+    
+    // 关键词检测
+    const text = msg.text?.toLowerCase() || "";
+    if (text.includes("help")) {
+      this.stats.data.keywords.help = (this.stats.data.keywords.help || 0) + 1;
+    }
+    
+    await this.stats.write();
+  };
+  
+  listenMessageHandlerIgnoreEdited = true;
+  
+  cmdHandlers = {
+    stats: async (msg: Api.Message) => {
+      const data = this.stats.data;
+      const userCount = Object.keys(data.users).length;
+      
+      await msg.edit({
+        text: `📊 <b>统计信息:</b>\n\n` +
+              `📨 总消息数: <code>${data.totalMessages}</code>\n` +
+              `👥 活跃用户: <code>${userCount}</code>\n` +
+              `🔍 Help请求: <code>${data.keywords.help || 0}</code>`,
+        parseMode: "html"
+      });
+    }
+  };
+}
+
+export default new MonitorPlugin();
+```
+
+### 定时任务插件
+
+```typescript
+import { Plugin } from "@utils/pluginBase";
+import { Api } from "telegram";
+import { getGlobalClient } from "@utils/globalClient";
+import { cronManager } from "@utils/cronManager";
+
+class SchedulePlugin extends Plugin {
+  description = "⏰ 定时任务插件";
+  private reminders: Map<string, any> = new Map();
+  
+  // 定时任务定义
+  cronTasks = {
+    dailyReport: {
+      cron: "0 9 * * *", // 每天早上9点
+      description: "每日报告",
+      handler: async (client: any) => {
+        const chatId = process.env.TB_REPORT_CHAT || "me";
+        await client.sendMessage(chatId, {
+          message: "📅 每日报告\n\n今天是新的一天，加油！"
+        });
+      }
+    }
+  };
+  
+  cmdHandlers = {
+    remind: async (msg: Api.Message) => {
+      const parts = msg.text?.split(/\s+/) || [];
+      if (parts.length < 3) {
+        await msg.edit({
+          text: "❌ 用法: <code>.remind [分钟] [提醒内容]</code>",
+          parseMode: "html"
+        });
+        return;
+      }
+      
+      const minutes = parseInt(parts[1]);
+      const reminder = parts.slice(2).join(" ");
+      
+      if (isNaN(minutes) || minutes <= 0) {
+        await msg.edit({ text: "❌ 请输入有效的分钟数" });
+        return;
+      }
+      
+      const reminderId = Date.now().toString();
+      const timeout = setTimeout(async () => {
+        const client = await getGlobalClient();
+        await client.sendMessage(msg.peerId, {
+          message: `⏰ <b>提醒:</b> ${reminder}`,
+          parseMode: "html",
+          replyTo: msg.id
+        });
+        this.reminders.delete(reminderId);
+      }, minutes * 60 * 1000);
+      
+      this.reminders.set(reminderId, timeout);
+      
+      await msg.edit({
+        text: `✅ 已设置提醒，将在 ${minutes} 分钟后提醒您`,
+        parseMode: "html"
+      });
+    },
+    
+    reminders: async (msg: Api.Message) => {
+      if (this.reminders.size === 0) {
+        await msg.edit({ text: "📝 没有活动的提醒" });
+        return;
+      }
+      
+      await msg.edit({
+        text: `📝 活动提醒数量: ${this.reminders.size}`,
+        parseMode: "html"
+      });
+    }
+  };
+}
+
+export default new SchedulePlugin();
+```
+
+## 📚 快速参考
+
+### 常用导入
+
+```typescript
+// 核心导入
+import { Plugin } from "@utils/pluginBase";
+import { Api } from "telegram";
+import { getGlobalClient } from "@utils/globalClient";
+import { getPrefixes } from "@utils/pluginManager";
+
+// 路径管理
+import { createDirectoryInAssets, createDirectoryInTemp } from "@utils/pathHelpers";
+
+// 数据库
+import { JSONFilePreset } from "lowdb/node";
+
+// 工具库
+import * as path from "path";
+import * as fs from "fs";
+import _ from "lodash";
+import dayjs from "dayjs";
+```
+
+### 快速命令模板
+
+```typescript
+// 单命令插件
+class QuickPlugin extends Plugin {
+  description = "快速插件";
+  cmdHandlers = {
+    cmd: async (msg: Api.Message) => {
+      await msg.edit({ text: "处理完成", parseMode: "html" });
+    }
+  };
+}
+
+export default new QuickPlugin();
+```
+
+### 常用代码片段
+
+```typescript
+// 获取客户端
+import { getGlobalClient } from "@utils/globalClient";
+const client = await getGlobalClient();
+if (!client) return;
+
+// 参数解析
+const args = msg.text?.trim().split(/\s+/).slice(1) || [];
+const subCommand = args[0] || "";
+
+// 错误处理
+try {
+  // 业务逻辑
+} catch (error) {
+  await msg.edit({ 
+    text: `❌ 错误: ${error.message}`,
+    parseMode: "html" 
+  });
+}
+
+// lowdb配置管理
+import { JSONFilePreset } from "lowdb/node";
+const db = await JSONFilePreset(configPath, { key: "value" });
+await db.update((data) => { data.key = newValue; });
+const value = db.data.key;
+```
+
+## 🎨 指令架构设计
 
 ### 术语定义
 
@@ -1497,54 +2678,52 @@ cmdHandlers = {
 ```
 
 #### 3. 别名 (Alias)
-同一功能的不同调用方式，通常是简写形式。支持多个别名。
+同一功能的不同调用方式，通常是简写形式。
 ```typescript
-// 单个别名
+// 指令级别别名
+cmdHandlers = {
+  speedtest: handleSpeed,  // 主指令
+  st: handleSpeed,        // 别名
+}
+
+// 子指令级别别名
 case 'search':
 case 's':  // "s" 是 "search" 的别名
   await this.handleSearch();
-  break;
-
-// 多个别名
-case 'download':
-case 'dl':     // 简写别名
-case 'd':      // 超短别名
-  await this.handleDownload();
-  break;
-
-case 'configuration':
-case 'config':
-case 'cfg':
-case 'set':
-  await this.handleConfig();
   break;
 ```
 
 ### 指令架构模式
 
-#### 模式一：主从指令模式（推荐，95%场景）
+#### 模式一：主从指令模式（推荐，99%场景）
 **适用场景：** 功能相关，共享配置或状态，需要统一管理
 
 ```typescript
 class MusicPlugin extends Plugin {
   cmdHandlers = {
     music: async (msg) => {
-      const [sub, ...args] = parseArgs(msg.message);
-      switch(sub) {
+      const parts = msg.text?.split(/\s+/) || [];
+      const [, sub, ...args] = parts;
+      
+      switch(sub?.toLowerCase()) {
         case 'search':
         case 's':  // 别名
-          await this.handleSearch(args);
+          await this.handleSearch(args.join(' '));
           break;
         case 'cookie':
           await this.handleCookie(args);
           break;
         case 'help':
         case 'h':  // 别名
-          await this.showHelp();
+          await this.showHelp(msg);
           break;
         default:
-          // 默认行为：直接搜索
-          await this.handleSearch([sub, ...args]);
+          // 默认行为：直接搜索或显示帮助
+          if (sub) {
+            await this.handleSearch(msg.text?.split(/\s+/).slice(1).join(' '));
+          } else {
+            await this.showHelp(msg);
+          }
       }
     }
   }
@@ -1552,489 +2731,189 @@ class MusicPlugin extends Plugin {
 // 用户使用：.music search 歌名、.music cookie set、.music help
 ```
 
-**特点：**
-- 单一主指令，内部处理多个子指令
-- 支持子指令别名（如 search/s、help/h）
-- 便于功能扩展和配置管理
-- 统一的参数解析和错误处理
-
-#### 模式二：独立指令模式（特殊场景）
-**适用场景：** 功能完全独立，用户明确要求使用短指令
-
+**实际案例（SSH插件）：**
 ```typescript
-class BanPlugin extends Plugin {
+class SSHPlugin extends Plugin {
   cmdHandlers = {
-    kick: async (msg) => { /* 踢人逻辑 */ },
-    ban: async (msg) => { /* 封禁逻辑 */ },
-    unban: async (msg) => { /* 解封逻辑 */ },
-    mute: async (msg) => { /* 禁言逻辑 */ }
+    ssh: async (msg: Api.Message) => {
+      const parts = msg.text?.split(/\s+/) || [];
+      const cmd = (parts[1] || "help").toLowerCase();
+      
+      switch(cmd) {
+        case "list":
+        case "ls":
+          await this.listServers(msg);
+          break;
+        case "add":
+          await this.addServer(msg);
+          break;
+        case "exec":
+          await this.executeCommand(msg);
+          break;
+        default:
+          await msg.edit({ text: help_text, parseMode: "html" });
+      }
+    }
   }
 }
-// 用户使用：.kick @user、.ban @user、.unban @user
+```
+
+**特点：**
+- 单一主指令入口
+- 内部路由处理子功能
+- 支持子指令别名
+- 便于功能扩展和配置管理
+- 统一的错误处理
+
+#### 模式二：独立指令模式（特殊场景，1%）  
+**适用场景：** 功能完全独立，需要提供便捷的短指令
+
+```typescript
+class SpeedTestPlugin extends Plugin {
+  cmdHandlers = {
+    speedtest: handleSpeedTest,  // 完整指令
+    st: handleSpeedTest,         // 短别名
+  }
+}
+// 用户使用：.speedtest 或 .st
+```
+
+**实际案例（Aban插件）：**
+```typescript
+class AbanPlugin extends Plugin {
+  cmdHandlers = {
+    // 帮助命令
+    aban: async (msg) => {
+      await MessageManager.smartEdit(msg, HELP_TEXT);
+    },
+    
+    // 基础管理命令 - 每个都是独立指令
+    kick: async (msg) => {
+      await CommandHandlers.handleBasicCommand(client, msg, 'kick');
+    },
+    ban: async (msg) => {
+      await CommandHandlers.handleBasicCommand(client, msg, 'ban');
+    },
+    unban: async (msg) => {
+      await CommandHandlers.handleBasicCommand(client, msg, 'unban');
+    },
+    mute: async (msg) => {
+      await CommandHandlers.handleBasicCommand(client, msg, 'mute');
+    },
+    unmute: async (msg) => {
+      await CommandHandlers.handleBasicCommand(client, msg, 'unmute');
+    },
+    
+    // 批量管理命令
+    sb: async (msg) => {
+      await CommandHandlers.handleSuperBan(client, msg);
+    },
+    unsb: async (msg) => {
+      await CommandHandlers.handleSuperUnban(client, msg);
+    }
+  }
+}
+// 用户使用：.kick @user、.ban @user、.mute @user 等
 ```
 
 **特点：**
 - 每个指令都是独立的处理函数
-- 用户直接使用短指令名
-- 适合功能简单、数量较少的指令组
+- 支持指令级别的别名
+- 适合单一功能插件
+- 用户可使用短指令快速访问
 
 ### 选择指南
 
-**默认选择：主从指令模式**
-- ✅ 适合 95% 的插件开发场景
-- ✅ 支持子指令别名（如 search/s、help/h）
-- ✅ 便于功能扩展和维护
-- ✅ 统一的错误处理和帮助系统
+**默认选择：主从指令模式（99%）**
+- ✅ 多个相关功能
+- ✅ 需要子命令（如 add、remove、list）
+- ✅ 共享配置或状态
+- ✅ 功能可能扩展
 
-**何时使用独立指令模式：**
-- 用户明确要求使用短指令（如 .kick、.ban）
-- 功能极其简单且不会扩展
-- 与现有系统保持兼容性
-
-### 别名设置方案
-
-#### 指令级别别名
-**适用于：** 单一功能插件，需要提供简写方式
-
-```typescript
-class ExamplePlugin extends Plugin {
-  cmdHandlers = {
-    fullcommand: handleCommand,  // 主指令（完整名称）
-    fc: handleCommand,           // 简写别名（首字母缩写）
-  }
-}
-```
-
-**插件别名映射示例：**
-- `fullcommand` - 主指令，完整功能名称
-- `fc` - 简写别名，取首字母缩写
-- 用户可以使用 `.fullcommand` 或 `.fc` 调用相同功能
-- 两个别名指向同一个处理函数，保持功能完全一致
-
-**别名设计原则：**
-1. **主指令**：使用完整的功能描述名称（如 `speedtest`）
-2. **简写别名**：通常取首字母缩写或常用简写（如 `st`）
-3. **字符限制**：别名仅支持英文字母和数字，不支持中文或特殊字符
-4. **一致性**：所有别名必须指向同一个处理函数
-5. **简洁性**：简写别名应该简短易记，通常 2-4 个字符
-
-#### 子指令级别别名
-```typescript
-switch(sub) {
-  case 'download':
-  case 'dl':
-  case 'd':
-    await this.handleDownload();
-    break;
-}
-```
+**何时使用独立指令模式（1%）：**
+- 单一独立功能
+- 需要极简的快捷指令
+- 功能不会扩展
+- 与其他功能无关联
 
 ### 帮助系统设计
 
-**所有插件都必须：**
-1. 定义帮助文本常量（推荐 `const help_text` 或 `const HELP_TEXT`）
-2. 在 `description` 中引用帮助文本（如 `${help_text}`）
-3. 支持 help 指令显示帮助
-4. 无参数时的合理默认行为（根据插件实际功能自定义，不强制要求显示帮助或报错）
-
-**实际项目中的命名约定：**
-- 推荐使用 `const help_text`（小写下划线）
-- 也可使用 `const HELP_TEXT`（大写下划线）
-- 保持项目内命名一致即可
-
-#### 帮助文档中的格式处理
-
-**当帮助文档包含代码、命令或链接时，需要特殊处理：**
+**所有插件必须：**
+1. 定义 `help_text` 常量
+2. 在 `description` 中引用帮助文本
+3. 支持 help 子指令或无参数时显示帮助
 
 ```typescript
-// ❌ 错误：直接在 help_text 中使用代码和链接
-const help_text = `📝 <b>功能插件</b>
-
-<b>使用方法：</b>
-command1 --option value
-command2 --flag
-
-<b>相关链接：</b>
-• 官网：https://example.com`;
-
-// ✅ 正确：使用 <pre> 标签包裹代码块和链接
-const help_text = `📝 <b>功能插件</b>
-
-<b>🚀 方案1 - 基础用法 (推荐)：</b>
-<pre>command1 --option value
-command2 --flag</pre>
-
-<b>🔧 方案2 - 高级用法：</b>
-<pre># 配置环境
-command setup --config
-
-# 执行操作
-command run --param value</pre>
-
-<b>相关链接：</b>
-• 官网：<pre>https://example.com</pre>
-• <a href="https://docs.example.com">文档</a>`;
-```
-
-**格式处理规则：**
-- **代码块必须用 `<pre>` 标签包裹**，保持格式和防止自动解析
-- **多行命令用 `<pre>` 包裹**，保持换行和缩进
-- **裸链接用 `<pre>` 包裹**，防止 Telegram 自动解析
-- **可点击链接用 `<a href="">` 标签**
-- **长代码块可以分段**，每段用独立的 `<pre>` 标签
-- **注释和说明可以在 `<pre>` 外部**，用普通 HTML 格式
-
-2. **渐进式状态反馈**
-   ```typescript
-   await msg.edit({ text: "🔄 初始化..." });
-   await msg.edit({ text: "🔍 搜索中..." });
-   await msg.edit({ text: "✅ 完成!" });
-   ```
-
-3. **错误消息格式**
-   - 始终使用 `❌ <b>错误类型:</b> 详细信息` 格式
-   - 所有用户输入必须经过 `htmlEscape()` 处理
-   - 提供有用的错误恢复建议
-
-### 指令注册示例对比
-
-#### 独立子指令模式（推荐用于功能独立的命令）
-```typescript
-// 独立指令风格 - 每个命令都是独立的
-class IndependentPlugin extends Plugin {
-  cmdHandlers = {
-    action1: async (msg) => { /* 操作1逻辑 */ },
-    action2: async (msg) => { /* 操作2逻辑 */ },
-    action3: async (msg) => { /* 操作3逻辑 */ },
-    action4: async (msg) => { /* 操作4逻辑 */ },
-    action5: async (msg) => { /* 操作5逻辑 */ }
-  }
-}
-// 用户使用：.action1 参数、.action2 参数、.action3 参数
-```
-
-#### 附属子指令模式（推荐用于功能相关的命令组）
-```typescript
-// 主从指令风格 - 所有子命令共享一个处理函数
-class MainSubPlugin extends Plugin {
-  cmdHandlers = {
-    maincommand: async (msg) => {
-      const [sub, ...args] = msg.message.split(' ').slice(1);
-      switch(sub) {
-        case 'subcommand1': await this.handleSubCommand1(args);
-        case 'subcommand2': await this.handleSubCommand2(args);
-        case 'help': await this.showHelp();
-      }
-    }
-  }
-}
-// 用户使用：.maincommand subcommand1 参数、.maincommand subcommand2 参数、.maincommand help
-```
-
-#### 3. 混合模式示例
-```typescript
-class MixedModePlugin extends Plugin {
-  cmdHandlers = {
-    // command1 和 command2 是独立命令
-    command1: async (msg) => {
-      const [action, ...params] = parseArgs(msg.message);
-      // action1/action2 是 command1 的附属子指令
-      if (action === 'action1') await this.handleCommand1Action1(params);
-      if (action === 'action2') await this.handleCommand1Action2(params);
-    },
-    
-    command2: async (msg) => {
-      const [action, ...params] = parseArgs(msg.message);
-      // action1/action2 是 command2 的附属子指令
-      if (action === 'action1') await this.handleCommand2Action1(params);
-      if (action === 'action2') await this.handleCommand2Action2(params);
-    }
-  }
-}
-
-// 用户使用
-// .command1 action1 参数
-// .command1 action2 参数
-// .command2 action1 参数
-```
-
-### 实际插件示例对比
-
-#### 1. 独立指令模式示例
-```typescript
-class IndependentCommandPlugin extends Plugin {
-  cmdHandlers = {
-    // 每个指令都是独立注册的
-    command1: handleCommand1,     // .command1 [参数]
-    command2: handleCommand2,     // .command2 [参数]  
-    command3: handleCommand3,     // .command3 [参数]
-    command4: handleCommand4,     // .command4 [参数]
-    command5: handleCommand5,     // .command5 [参数]
-  }
-}
-
-// 用户直接使用每个指令
-// .command1 参数1
-// .command2 参数2
-// .command3 参数3
-```
-
-#### 2. 主从指令模式示例
-```typescript
-class MainSubCommandPlugin extends Plugin {
-  cmdHandlers = {
-    maincommand: async (msg) => {
-      const [sub, ...args] = parseArgs(msg.message);
-      
-      // 所有子指令都在这个函数内处理
-      switch(sub) {
-        case 'subcommand1':
-        case 's1':  // 别名
-          await this.handleSubCommand1(args);
-          break;
-          
-        case 'subcommand2':
-          const action = args[0];
-          if (action === 'action1') await this.handleAction1(args.slice(1));
-          if (action === 'action2') await this.handleAction2();
-          if (action === 'action3') await this.handleAction3();
-          break;
-          
-        case 'help':
-        case 'h':  // 别名
-          await this.showHelp();
-          break;
-          
-        default:
-          // 默认行为：执行默认操作
-          await this.handleDefault(msg.message);
-      }
-    }
-  }
-}
-
-// 用户使用主指令 + 子指令
-// .maincommand subcommand1 参数
-// .maincommand subcommand2 action1 参数
-// .maincommand help
-```
-
-#### 3. 混合模式示例
-```typescript
-class MixedModePlugin extends Plugin {
-  cmdHandlers = {
-    // command1 和 command2 是独立命令
-    command1: async (msg) => {
-      const [action, ...params] = parseArgs(msg.message);
-      // action1/action2 是 command1 的附属子指令
-      if (action === 'action1') await this.handleCommand1Action1(params);
-      if (action === 'action2') await this.handleCommand1Action2(params);
-    },
-    
-    command2: async (msg) => {
-      const [action, ...params] = parseArgs(msg.message);
-      // action1/action2 是 command2 的附属子指令
-      if (action === 'action1') await this.handleCommand2Action1(params);
-      if (action === 'action2') await this.handleCommand2Action2(params);
-    }
-  }
-}
-
-// 用户使用
-// .command1 action1 参数
-// .command1 action2 参数
-// .command2 action1 参数
-```
-
-### 选择指南
-
-#### 何时使用独立子指令？
-- ✅ 每个命令功能完全独立
-- ✅ 命令之间没有共享状态或配置
-- ✅ 用户习惯直接使用短命令
-- ✅ 命令数量较少（通常 < 10个）
-
-#### 何时使用附属子指令？
-- ✅ 命令组功能相关，共享配置或状态
-- ✅ 需要统一的参数解析逻辑
-- ✅ 子命令较多或可能扩展
-- ✅ 需要默认行为（无子命令时）
-
-### 使用示例
-```
-.command1 action1 参数值
-.command1 action2 参数值
-.command2 action1 参数值
-.command2 action2 参数值
-.maincommand subcommand1 参数
-.maincommand help
-```
-
-### 常见错误示例
-
-#### ❌ 错误：插件导出方式错误（严重问题）
-```typescript
-// ❌ 错误：导出类而非实例，会导致插件无法加载
-class SSHPlugin extends Plugin {
-  // ... 插件实现
-}
-
-export default SSHPlugin;  // ❌ 错误：导出的是类
-```
-
-**问题现象：**
-- 在 TG 中输入命令没有任何反应
-- 插件看起来没有启用
-- 插件管理器无法识别插件
-
-**根本原因：**
-插件管理器在 `pluginManager.ts` 中通过 `instanceof Plugin` 检查导出的对象：
-```typescript
-// pluginManager.ts 第57行
-if (plugin instanceof Plugin && isValidPlugin(plugin)) {
-  validPlugins.push(plugin);
-}
-```
-
-类定义本身不是 Plugin 的实例，只有通过 `new` 创建的对象才是实例。
-
-#### ✅ 正确：必须导出插件实例
-```typescript
-class SSHPlugin extends Plugin {
-  // ... 插件实现
-}
-
-export default new SSHPlugin();  // ✅ 正确：导出实例
-```
-
-**修复步骤：**
-1. 检查插件文件最后一行的导出语句
-2. 确保使用 `export default new PluginClass();`
-3. 重启 TeleBox 服务让修改生效
-
-**验证方法：**
-```bash
-# 重启服务后测试
-.插件名称 help      # 应该显示帮助信息
-.ping              # 测试其他插件是否正常
-```
-
-#### ❌ 错误：混淆指令架构模式
-```typescript
-// 错误：试图将子指令注册为独立指令
-class WrongPlugin extends Plugin {
-  cmdHandlers = {
-    music: handleMusic,
-    search: handleSearch,  // ❌ search 应该是 music 的子指令
-    cookie: handleCookie   // ❌ cookie 应该是 music 的子指令
-  }
-}
-```
-
-#### ✅ 正确：保持架构模式一致
-```typescript
-class CorrectPlugin extends Plugin {
-  cmdHandlers = {
-    music: async (msg) => {
-      const [sub] = parseArgs(msg.message);
-      if (sub === 'search') { /* ... */ }
-      if (sub === 'cookie') { /* ... */ }
-    }
-  }
-}
-```
-
-### 帮助文档最佳实践
-
-#### 独立子指令的帮助文档
-```typescript
-// ✅ 必须定义 help_text 常量
-const help_text = `📋 <b>功能管理插件</b>
-
-<b>可用命令：</b>
-• <code>command1</code> - 执行操作1
-• <code>command2</code> - 执行操作2  
-• <code>command3</code> - 执行操作3
-• <code>command4</code> - 执行操作4
-
-<b>使用方式：</b>
-每个命令可独立使用，例如：
-<code>.command1 参数</code>
-<code>.command2 参数 原因</code>`;
-
-class IndependentPlugin extends Plugin {
-  // ✅ 必须在 description 中引用 help_text
-  description: string = `功能管理插件\n\n${help_text}`;
-}
-```
-
-#### 附属子指令的帮助文档
-```typescript
-// ✅ 必须定义 help_text 常量
-const help_text = `📋 <b>综合功能插件</b>
+const help_text = `📝 <b>插件名称</b>
 
 <b>命令格式：</b>
-<code>${mainPrefix}maincommand [参数] 或 ${mainPrefix}maincommand [子命令] [参数]</code>
+<code>.cmd [子命令] [参数]</code>
 
-<b>子命令：</b>
-• <code>${mainPrefix}maincommand subcommand1 参数</code> - 执行子功能1
-• <code>${mainPrefix}maincommand subcommand2 set [内容]</code> - 设置配置项
-• <code>${mainPrefix}maincommand subcommand2 get</code> - 查看当前配置
-• <code>${mainPrefix}maincommand subcommand2 clear</code> - 清除配置
-• <code>${mainPrefix}maincommand config</code> - 查看所有配置
-• <code>${mainPrefix}maincommand help</code> - 显示此帮助
+<b>可用命令：</b>
+• <code>.cmd sub1</code> - 子命令1说明
+• <code>.cmd sub2</code> - 子命令2说明
+• <code>.cmd help</code> - 显示帮助`;
 
-<b>配置命令：</b>
-• <code>${mainPrefix}maincommand config key1 [值]</code> - 设置配置项1
-• <code>${mainPrefix}maincommand config key2 [值]</code> - 设置配置项2
-• <code>${mainPrefix}maincommand config key3 [值]</code> - 设置配置项3
-
-<b>使用示例：</b>
-<code>${mainPrefix}maincommand 参数值</code> - 直接执行
-<code>${mainPrefix}maincommand subcommand1 参数值</code> - 明确执行子命令`;
-
-class MainCommandPlugin extends Plugin {
-  // ✅ 必须在 description 中引用 help_text
-  description: string | ((...args: any[]) => string | void) = `综合功能插件\n\n${help_text}`;
+class MyPlugin extends Plugin {
+  description = `插件简介\n\n${help_text}`;
   
   cmdHandlers = {
-    maincommand: async (msg: Api.Message) => {
-      const client = await getGlobalClient();
-      if (!client) {
-        await msg.edit({ text: "❌ 客户端未初始化", parseMode: "html" });
+    cmd: async (msg) => {
+      const sub = msg.text?.split(/\s+/)[1];
+      if (!sub || sub === 'help') {
+        await msg.edit({ text: help_text, parseMode: "html" });
         return;
       }
-
-      const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
-      const parts = lines?.[0]?.split(/\s+/) || [];
-      const [, ...args] = parts;
-      const sub = (args[0] || "").toLowerCase();
-
-      try {
-        // 无参数时的处理（根据插件功能自定义默认行为）
-        if (!sub) {
-          // 示例：可以显示帮助、执行默认操作或提示参数不足
-          // 具体行为根据插件实际需求决定
-          await msg.edit({ text: help_text, parseMode: "html" });
-          return;
-        }
-
-        // 处理 help 命令
-        if (sub === "help" || sub === "h") {
-          await msg.edit({ text: help_text, parseMode: "html" });
-          return;
-        }
-
-        // 处理其他子命令...
-        
-      } catch (error: any) {
-        console.error("[plugin] 插件执行失败:", error);
-        await msg.edit({
-          text: `❌ <b>插件执行失败:</b> ${htmlEscape(error.message)}`,
-          parseMode: "html"
-        });
-      }
+      // 处理其他子命令...
     }
-  };
+  }
+}
+```
+
+### 参数解析模式
+
+#### 单行命令解析
+```typescript
+const parts = msg.text?.split(/\s+/) || [];
+const [cmd, sub, ...args] = parts;
+// .music search hello world -> ["music", "search", "hello", "world"]
+```
+
+#### 多行命令解析（复杂参数）
+```typescript
+const lines = msg.text?.trim()?.split(/\r?\n/g) || [];
+const parts = lines[0]?.split(/\s+/) || [];
+const [cmd, sub] = parts;
+const param1 = lines[1]; // 第二行作为参数1
+const param2 = lines[2]; // 第三行作为参数2
+// 适用于需要多行输入的场景，如SSH配置、长文本等
+```
+
+### 错误处理规范
+
+```typescript
+cmdHandlers = {
+  cmd: async (msg) => {
+    try {
+      // 参数验证
+      if (!args.length) {
+        await msg.edit({ 
+          text: "❌ 请提供必要参数", 
+          parseMode: "html" 
+        });
+        return;
+      }
+      
+      // 业务逻辑
+      await this.doSomething();
+      
+    } catch (error) {
+      console.error(`[${PLUGIN_NAME}] 错误:`, error);
+      await msg.edit({ 
+        text: `❌ 错误: ${htmlEscape(error.message)}`,
+        parseMode: "html" 
+      });
+    }
+  }
 }
 ```
