@@ -13,6 +13,7 @@ import { getPrefixes } from "@utils/pluginManager";
 
 const prefixes = getPrefixes();
 const mainPrefix = prefixes[0];
+const MAX_MESSAGE_LENGTH = 4000; // Telegram 消息长度限制（留有余地）
 
 // 数据库类型定义 (精简: 直接用 根对象 { [name]: PluginRecord })
 interface PluginRecord {
@@ -79,6 +80,96 @@ async function updateProgressMessage(
   } catch (error) {
     console.log(`[TPM] 编辑进度消息失败，静默继续: ${error}`);
     return false;
+  }
+}
+
+// 分割长文本为多个消息
+function splitLongText(text: string, maxLength: number = MAX_MESSAGE_LENGTH): string[] {
+  if (text.length <= maxLength) {
+    return [text];
+  }
+
+  const messages: string[] = [];
+  const lines = text.split('\n');
+  let currentMessage = '';
+
+  for (const line of lines) {
+    // 如果单行就超过限制，需要强制分割
+    if (line.length > maxLength) {
+      if (currentMessage) {
+        messages.push(currentMessage);
+        currentMessage = '';
+      }
+      // 强制分割超长行
+      for (let i = 0; i < line.length; i += maxLength) {
+        messages.push(line.substring(i, i + maxLength));
+      }
+      continue;
+    }
+
+    // 如果加上这一行会超过限制
+    if (currentMessage.length + line.length + 1 > maxLength) {
+      messages.push(currentMessage);
+      currentMessage = line;
+    } else {
+      currentMessage += (currentMessage ? '\n' : '') + line;
+    }
+  }
+
+  if (currentMessage) {
+    messages.push(currentMessage);
+  }
+
+  return messages;
+}
+
+// 发送长文本（自动分段）
+async function sendLongMessage(
+  msg: Api.Message,
+  text: string,
+  options?: { parseMode?: string; linkPreview?: boolean },
+  isEdit: boolean = true
+): Promise<void> {
+  const messages = splitLongText(text);
+  
+  if (messages.length === 0) {
+    return;
+  }
+
+  const messageOptions = {
+    parseMode: options?.parseMode || undefined,
+    linkPreview: options?.linkPreview !== false,
+  };
+
+  // 第一条消息编辑原消息或发送新消息
+  if (isEdit) {
+    try {
+      await msg.edit({
+        text: messages[0],
+        ...messageOptions,
+      });
+    } catch (error) {
+      // 编辑失败则发送新消息
+      await msg.client?.sendMessage(msg.peerId, {
+        message: messages[0],
+        ...messageOptions,
+        replyTo: msg.replyTo?.replyToMsgId,
+      });
+    }
+  } else {
+    await msg.client?.sendMessage(msg.peerId, {
+      message: messages[0],
+      ...messageOptions,
+      replyTo: msg.replyTo?.replyToMsgId,
+    });
+  }
+
+  // 后续消息作为回复发送
+  for (let i = 1; i < messages.length; i++) {
+    await msg.reply({
+      message: `📋 <b>续 (${i}/${messages.length - 1}):</b>\n\n${messages[i]}`,
+      ...messageOptions,
+    });
   }
 }
 
@@ -767,6 +858,8 @@ async function search(msg: Api.Message) {
       const description = pluginData?.desc || "暂无描述";
       pluginEntries.push({ name: plugin, status, desc: description });
     }
+    
+    // 保留完整描述的插件列表
     const pluginLines: string[] = pluginEntries.map(
       (p) => `${p.status} <code>${p.name}</code> - ${p.desc}`
     );
@@ -779,54 +872,31 @@ async function search(msg: Api.Message) {
       `• ❌ 未安装: ${notInstalledCount} 个`;
 
     const installTip =
-      `\n💡 <b>快捷操作</b>\n` +
+      `\n💡 <b>快捷操作:</b>\n` +
       `• <code>${mainPrefix}tpm i &lt;名称 [名称2 ...]&gt;</code> 安装/批量安装\n` +
       `• <code>${mainPrefix}tpm i all</code> 全部安装\n` +
       `• <code>${mainPrefix}tpm update</code> 更新已装\n` +
       `• <code>${mainPrefix}tpm ls</code> 查看记录\n` +
-      `• <code>${mainPrefix}tpm rm &lt;名称&gt;</code> 卸载 \n` +
+      `• <code>${mainPrefix}tpm rm &lt;名称&gt;</code> 卸载\n` +
       `• <code>${mainPrefix}tpm rm all</code> 清空`;
 
     const repoLink = `\n🔗 <b>插件仓库:</b> <a href="https://github.com/TeleBoxDev/TeleBox_Plugins">TeleBox_Plugins</a>`;
 
-    // 构造单条消息，插件列表整体折叠
-    const MAX_LEN = 3500; // 保守阈值，避免超过Telegram限制
-    const makeMessage = (lines: string[]) =>
-      `🔍 <b>远程插件列表:</b>\n\n${statsInfo}\n\n<b>插件详情（点击展开）:</b>\n<blockquote expandable>\n${lines.join("\n")}\n</blockquote>\n${installTip}\n${repoLink}`;
-    const makeMessageMinimal = (lines: string[]) =>
-      `🔍 <b>远程插件列表:</b>\n\n${statsInfo}\n\n<blockquote expandable>\n${lines.join("\n")}\n</blockquote>`;
+    // 构建完整消息，使用折叠展示插件列表
+    const fullMessage = [
+      `🔍 <b>远程插件列表</b>`,
+      `━━━━━━━━━━━━━━━━━`,
+      "",
+      statsInfo,
+      "",
+      `📦 <b>插件详情（点击展开）:</b>`,
+      `<blockquote expandable>${pluginLines.join("\n")}</blockquote>`,
+      installTip,
+      repoLink
+    ].join("\n");
 
-    let message = makeMessage(pluginLines);
-
-    // 如果消息过长，尝试去掉描述，仅保留插件名以保证单条消息
-    if (message.length > MAX_LEN) {
-      const compactLines = pluginEntries.map(
-        (p) => `${p.status} <code>${p.name}</code>`
-      );
-      message = makeMessage(compactLines);
-
-      // 仍然过长，则去掉安装提示与仓库链接
-      if (message.length > MAX_LEN) {
-        message = makeMessageMinimal(compactLines);
-      }
-
-      // 仍超长，裁剪行数以适配，并在末尾追加省略提示
-      if (message.length > MAX_LEN) {
-        const trimmed: string[] = [];
-        let acc = 0;
-        for (const line of compactLines) {
-          const l = line.length + 1; // 包含换行
-          if (acc + l > MAX_LEN - 200) break; // 为标题等预留空间
-          trimmed.push(line);
-          acc += l;
-        }
-        const omitted = compactLines.length - trimmed.length;
-        if (omitted > 0) trimmed.push(`... 还有 ${omitted} 个`);
-        message = makeMessageMinimal(trimmed);
-      }
-    }
-
-    await sendOrEditMessage(statusMsg, message, { parseMode: "html", linkPreview: false });
+    // 使用自动分段发送功能，确保插件描述不会丢失
+    await sendLongMessage(statusMsg, fullMessage, { parseMode: "html", linkPreview: false }, true);
   } catch (error) {
     console.error("[TPM] 搜索插件失败:", error);
     await sendOrEditMessage(msg, `❌ 搜索插件失败: ${error}`);
@@ -886,71 +956,46 @@ async function showPluginRecords(msg: Api.Message, verbose?: boolean) {
       return `<code>${name}</code> 🗄 ${mtime}`;
     });
 
-    const MAX_LEN = 3500;
+    // 生成消息
     const tip = verbose
       ? ""
       : `💡 可使用 <code>${mainPrefix}tpm ls -v</code> 查看详情信息`;
 
-    const makeMessage = (
-      dbLines: string[],
-      localLines: string[]
-    ): string => {
-      const dbBlock = dbLines.length
-        ? `\n<blockquote expandable>\n${dbLines.join("\n")}\n</blockquote>`
-        : `\n<blockquote expandable>\n（空）\n</blockquote>`;
-      const localPart = notInDb.length
-        ? `\n🗂 <b>本地插件 (${notInDb.length}个):</b>\n<blockquote expandable>\n${localLines.join(
-            "\n"
-          )}\n</blockquote>`
-        : "";
-      return `${tip ? tip + "\n\n" : ""}📚 <b>远程插件记录 (${dbNames.length}个)</b>${dbBlock}${localPart}`;
-    };
+    // 选择显示模式
+    const dbLines = verbose ? dbLinesVerbose : dbLinesSimple;
+    const localLines = verbose ? localLinesVerbose : localLinesSimple;
 
-    // 首选：按 verbose 参数使用对应行
-    let useVerbose = !!verbose;
-    let dbUse = useVerbose ? dbLinesVerbose : dbLinesSimple;
-    let localUse = useVerbose ? localLinesVerbose : localLinesSimple;
-    let message = makeMessage(dbUse, localUse);
-
-    // Fallback 1：过长则退化到简洁模式
-    if (message.length > MAX_LEN && useVerbose) {
-      useVerbose = false;
-      dbUse = dbLinesSimple;
-      localUse = localLinesSimple;
-      message = makeMessage(dbUse, localUse);
+    // 构建完整消息
+    const messageParts = [];
+    
+    messageParts.push(`📚 <b>插件记录</b>`);
+    messageParts.push(`━━━━━━━━━━━━━━━━━`);
+    
+    if (tip) {
+      messageParts.push("", tip);
     }
-
-    // Fallback 2：仍过长则裁剪行数，附省略说明
-    if (message.length > MAX_LEN) {
-      let dbTrim = [...dbUse];
-      let localTrim = [...localUse];
-      let dbOmit = 0;
-      let localOmit = 0;
-
-      const buildWithOmit = () => {
-        const dbLines = [...dbTrim];
-        const localLines = [...localTrim];
-        if (dbOmit > 0) dbLines.push(`... 还有 ${dbOmit} 个`);
-        if (localOmit > 0) localLines.push(`... 还有 ${localOmit} 个`);
-        return makeMessage(dbLines, localLines);
-      };
-
-      message = buildWithOmit();
-      while (message.length > MAX_LEN && (dbTrim.length > 0 || localTrim.length > 0)) {
-        if (dbTrim.length >= localTrim.length && dbTrim.length > 0) {
-          dbTrim.pop();
-          dbOmit++;
-        } else if (localTrim.length > 0) {
-          localTrim.pop();
-          localOmit++;
-        } else {
-          break;
-        }
-        message = buildWithOmit();
-      }
+    
+    // 远程插件记录
+    if (dbNames.length > 0) {
+      messageParts.push("", `📦 <b>远程插件记录 (${dbNames.length}个):</b>`);
+      messageParts.push(`<blockquote expandable>${dbLines.join("\n")}</blockquote>`);
+    } else {
+      messageParts.push("", `📦 <b>远程插件记录:</b> (空)`);
     }
-
-    await sendOrEditMessage(statusMsg, message, { parseMode: "html", linkPreview: false });
+    
+    // 本地插件
+    if (notInDb.length > 0) {
+      messageParts.push("", `🗂 <b>本地插件 (${notInDb.length}个):</b>`);
+      messageParts.push(`<blockquote expandable>${localLines.join("\n")}</blockquote>`);
+    }
+    
+    messageParts.push("", `━━━━━━━━━━━━━━━━━`);
+    messageParts.push(`📊 总计: ${dbNames.length + notInDb.length} 个插件`);
+    
+    const fullMessage = messageParts.join("\n");
+    
+    // 使用自动分段发送功能
+    await sendLongMessage(statusMsg, fullMessage, { parseMode: "html", linkPreview: false }, true);
   } catch (error) {
     console.error("[TPM] 读取插件数据库失败:", error);
     await sendOrEditMessage(msg, `❌ 读取数据库失败: ${error}`);
