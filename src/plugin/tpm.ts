@@ -799,7 +799,12 @@ async function search(msg: Api.Message) {
   const url = `https://github.com/TeleBoxDev/TeleBox_Plugins/blob/main/plugins.json?raw=true`;
   try {
     const statusMsg = await sendOrEditMessage(msg, "🔍 正在获取插件列表...");
-    const res = await axios.get(url);
+    const res = await axios.get(url, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     if (res.status !== 200) {
       await sendOrEditMessage(statusMsg, `❌ 无法获取远程插件库`);
       return;
