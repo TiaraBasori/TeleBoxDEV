@@ -70,8 +70,8 @@ class TeleBoxStatusMonitor extends Plugin {
            `Node.js版本: <code>${versions.nodejs}</code>\n` +
            `Telegram库版本: <code>${versions.telegram}</code>\n` +
            `TeleBox版本: <code>${versions.telebox}</code>\n` +
-           `CPU使用率: <code>${cpuUsage}% / ${processCpuUsage}%</code>\n` +
-           `内存使用率: <code>${memPercent}% / ${processMemPercent}%</code>\n` +
+           `CPU使用率: <code>${cpuUsage}%</code> / <code>${processCpuUsage}%</code>\n` +
+           `内存使用率: <code>${memPercent}%</code> / <code>${processMemPercent}%</code>\n` +
            `SWAP使用率: <code>${systemDetails.swapPercent}%</code>\n` +
            `运行时间: <code>${uptimeStr}</code>\n` +
            `扫描时间: <code>${scanTime}ms</code>`;
